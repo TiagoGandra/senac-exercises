@@ -4,6 +4,7 @@ matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
 
 # Engenharia
 
@@ -75,10 +76,10 @@ def tratamentoArquivo(dataset):
 
     dataset['uf'] = pd.cut(dataset['cep'], bins=limites, labels=estados, right=True, ordered=False)
 
-    # Codificar os dados que são str
+    # Codificar os dados que são str para machine learning
     lb = LabelEncoder()
-    dataset['Regiao'] = lb.fit_transform(dataset['Regiao'])
-    dataset['uf'] = lb.fit_transform(dataset['uf'])
+    dataset['Regiao_cod'] = lb.fit_transform(dataset['Regiao'])
+    dataset['uf_cod'] = lb.fit_transform(dataset['uf'])    
     
     # Quais são as 5 regiões com maior variação (desvio padrão) por renda?
     desvio_renda = dataset.groupby('Regiao')['renda_per_capita'].std().sort_values(ascending=False)
@@ -95,6 +96,18 @@ def tratamentoArquivo(dataset):
 
 dados = tratamentoArquivo(dados)
 
+# Divisão treino/teste para Machine Learning
+X = dados[['Regiao_cod', 'uf_cod', 'cep']]  # entradas (treino)
+y = dados['renda_per_capita']               # saída (teste)
+
+X_treino, X_teste, y_treino, y_teste = train_test_split(
+    X, y,
+    test_size=0.3,
+    random_state=42
+)
+
+print(f"Treino: {len(X_treino)} registros")
+print(f"Teste:  {len(X_teste)} registros")
 
 
 # Analise de dados
