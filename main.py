@@ -39,23 +39,7 @@ def tratamentoArquivo(dataset):
     dataset.drop_duplicates(inplace=True)
     dataset.dropna(inplace=True)
     dataset = dataset[dataset['POSTCODE'] != 'Sem CEP']
-    dataset.drop(columns=["CD_GEOCODI", "LON", "LAT"], inplace=True)
-
-    # Adição da coluna com primeiro caracter do cep para identificar a região
-    dataset['Regiao'] = dataset['POSTCODE'].str[0]
-    regiao = {
-        '0': 'Sede São Paulo',
-        '1': 'Sede Santos',
-        '2': 'Sede Rio de Janeiro',
-        '3': 'Sede Belo Horizonte',
-        '4': 'Sede Sede Salvador',
-        '5': 'Sede Recife',
-        '6': 'Sede Fortaleza',
-        '7': 'Sede Brasília',
-        '8': 'Sede Curitiba',
-        '9': 'Sede Porto Alegre'
-    }
-    dataset['Regiao'] = dataset['Regiao'].map(regiao)
+    dataset.drop(columns=["CD_GEOCODI"], inplace=True)
 
     # Por estado
     dataset['cep'] = dataset['POSTCODE'].str.replace(r'\D', '', regex=True).astype('int32')
@@ -73,8 +57,20 @@ def tratamentoArquivo(dataset):
         "CE", "PI", "MA", "PA", "AP", "AM", "RR", "AM", "AC", "DF", 
         "GO", "DF", "GO", "RO", "TO", "MT", "MS", "PR", "SC", "RS"
     ]
-
     dataset['uf'] = pd.cut(dataset['cep'], bins=limites, labels=estados, right=True, ordered=False)
+
+    mapa_estados_regiao = {
+        'AM': 'norte',  'AC': 'norte',  'PA': 'norte', 'RR': 'norte', 'AP': 'norte', 'RO': 'norte',
+        'AL': 'nordeste', 'BA': 'nordeste', 'CE': 'nordeste', 'MA': 'nordeste', 'PB': 'nordeste',
+        'PE': 'nordeste', 'PI': 'nordeste', 'RN': 'nordeste', 'SE': 'nordeste',
+        'DF': 'centro-oeste', 'GO': 'centro-oeste', 'MT': 'centro-oeste', 'MS': 'centro-oeste',
+        'ES': 'sudeste', 'MG': 'sudeste', 'RJ': 'sudeste', 'SP': 'sudeste',
+        'PR': 'sul', 'RS': 'sul', 'SC': 'sul'
+    }
+
+    dataset['regiao'] = dataset['uf'].map(mapa_estados_regiao)
+    
+    print(dataset['regiao'])
 
     # Codificar os dados que são str para machine learning
     lb = LabelEncoder()
@@ -115,7 +111,7 @@ print(f"Teste:  {len(X_teste)} registros")
 def visualizarDados(dataset):
 
     # --- Gráfico 1: Qual a média de renda per capita por região? ---
-    media_renda_regiao = dataset.groupby('Regiao')['renda_per_capita'].mean()
+    media_renda_regiao = dataset.groupby('regiao')['renda_per_capita'].mean()
 
     plt.figure(figsize=(10, 6))
     media_renda_regiao.plot(kind='bar')
@@ -150,7 +146,7 @@ def visualizarDados(dataset):
     plt.show()
 
     # --- Gráfico 4: Quais são as regiões com maior variação (desvio padrão) de renda? ---
-    desvio_renda = dataset.groupby('Regiao')['renda_per_capita'].std().sort_values(ascending=False)
+    desvio_renda = dataset.groupby('regiao')['renda_per_capita'].std().sort_values(ascending=False)
 
     plt.figure(figsize=(10, 6))
     desvio_renda.plot(kind='bar')
@@ -172,16 +168,16 @@ def visualizarDados(dataset):
     plt.show()
 
     # --- Gráfico 6: Como se distribui a renda per capita em cada estado (UF)? ---
-    dataset.boxplot(column='renda_per_capita', by='uf', figsize=(10, 6))
-    plt.title('Distribuição de Renda por UF')
+    dataset.boxplot(column='renda_per_capita', by='regiao', figsize=(10, 6))
+    plt.title('Distribuição de Renda por Região')
     plt.suptitle('')
     plt.ylabel('Renda Per Capita (R$)')
     plt.tight_layout()
     plt.show()
 
     # --- Gráfico 7: Como se distribui a renda por estado ignorando os valores extremos? ---
-    dataset.boxplot(column='renda_per_capita', by='uf', showfliers=False, figsize=(10, 6), grid=False)
-    plt.title('Distribuição de Renda por UF (Sem Outliers)')
+    dataset.boxplot(column='renda_per_capita', by='regiao', showfliers=False, figsize=(10, 6), grid=False)
+    plt.title('Distribuição de Renda por Região (Sem Outliers)')
     plt.suptitle('')
     plt.ylabel('Renda Per Capita (R$)')
     plt.tight_layout()
