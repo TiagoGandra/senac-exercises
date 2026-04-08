@@ -146,11 +146,11 @@ def visualizarDados(dataset):
     plt.show()
 
     # --- Gráfico 4: Quais são as regiões com maior variação (desvio padrão) de renda? ---
-    desvio_renda = dataset.groupby('regiao')['renda_per_capita'].std().sort_values(ascending=False)
+    desvio_renda = dataset.groupby('uf')['renda_per_capita'].std().sort_values(ascending=False)
 
     plt.figure(figsize=(10, 6))
     desvio_renda.plot(kind='bar')
-    plt.title('Regiões com maior variação de renda')
+    plt.title('Estados com maior variação de renda')
     plt.ylabel('Desvio Padrão (R$)')
     plt.xticks(rotation=45)
     plt.tight_layout()
@@ -159,7 +159,7 @@ def visualizarDados(dataset):
     # --- Gráfico 5: Como evolui o desvio padrão de renda entre as regiões (ordem decrescente)? ---
     plt.figure(figsize=(10, 5))
     plt.plot(desvio_renda.index, desvio_renda.values, marker='o', linestyle='-', color='teal', linewidth=2)
-    plt.title('Desvio Padrão da Renda por Região (Decrescente)', fontsize=14)
+    plt.title('Desvio Padrão da Renda por Estado (Decrescente)', fontsize=14)
     plt.xlabel('Região', fontsize=12)
     plt.ylabel('Desvio Padrão (R$)', fontsize=12)
     plt.grid(True, linestyle='--', alpha=0.6)
@@ -180,6 +180,25 @@ def visualizarDados(dataset):
     plt.title('Distribuição de Renda por Região (Sem Outliers)')
     plt.suptitle('')
     plt.ylabel('Renda Per Capita (R$)')
+    plt.tight_layout()
+    plt.show()
+
+    # --- Gráfico 8: Mapa geográfico - Renda Per Capita por Localização ---
+    fig, ax = plt.subplots(figsize=(12, 10))
+    sc = ax.scatter(
+        dataset['LON'], dataset['LAT'],
+        c=dataset['renda_per_capita'],
+        cmap='RdYlGn',
+        s=2,
+        alpha=0.6,
+        vmin=dataset['renda_per_capita'].quantile(0.05),
+        vmax=dataset['renda_per_capita'].quantile(0.95)
+    )
+    plt.colorbar(sc, ax=ax, label='Renda Per Capita (R$)')
+    ax.set_title('Renda Per Capita por Localização Geográfica', fontsize=14)
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
+    ax.set_aspect('equal')
     plt.tight_layout()
     plt.show()
 
