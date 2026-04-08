@@ -74,11 +74,11 @@ def tratamentoArquivo(dataset):
 
     # Codificar os dados que são str para machine learning
     lb = LabelEncoder()
-    dataset['Regiao_cod'] = lb.fit_transform(dataset['Regiao'])
+    dataset['Regiao_cod'] = lb.fit_transform(dataset['regiao'])
     dataset['uf_cod'] = lb.fit_transform(dataset['uf'])    
     
     # Quais são as 5 regiões com maior variação (desvio padrão) por renda?
-    desvio_renda = dataset.groupby('Regiao')['renda_per_capita'].std().sort_values(ascending=False)
+    desvio_renda = dataset.groupby('regiao')['renda_per_capita'].std().sort_values(ascending=False)
     print("Regiões com maior variação de renda:")
     print(desvio_renda.head(5))
 
