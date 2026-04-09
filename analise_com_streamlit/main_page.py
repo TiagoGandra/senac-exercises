@@ -1,12 +1,11 @@
-from dados import DataProcessor
+from dados import load_data, process_data
 import streamlit as st
 
-dados = DataProcessor("../cep_coordinates_per_capita_income.csv").load_data()
-dados_processados = DataProcessor.process_data(dados)
+if "dados" not in st.session_state:
+    st.session_state.dados = load_data("cep_coordinates_per_capita_income.csv")
 
-if "dados" not in st.session_state or "dados_processados" not in st.session_state:
-    st.session_state["dados"] = dados
-    st.session_state["dados_processados"] = dados_processados
+if "dados_processados" not in st.session_state:
+    st.session_state.dados_processados = process_data(st.session_state.dados)
     
 # Descrição do que a analise em estudo se baseia
 try:
