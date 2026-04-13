@@ -97,6 +97,43 @@ dados = tratarArquivo(dados)
 
 def visualizarDados(dataset):
 
+    # --- Slide 0: Apresentação ---
+    fig, ax = plt.subplots(figsize=(12, 7))
+    ax.axis('off')
+
+    titulo = "Análise de Renda Per Capita por CEP no Brasil"
+    descricao = (
+        "O Brasil é um dos países com maior desigualdade de renda do mundo.\n"
+        "Este estudo utiliza dados de renda per capita associados a CEPs brasileiros\n"
+        "para explorar padrões regionais, identificar disparidades entre estados e regiões\n"
+        "e construir uma base para modelos preditivos de renda a partir de localização geográfica."
+    )
+    perguntas = [
+        "1. Qual a média e variabilidade da renda per capita por região?",
+        "2. Como se distribui proporcionalmente a renda média entre as regiões?",
+        "3. Quais estados apresentam maior desigualdade interna de renda?",
+        "4. Como se distribui a renda típica por região, sem considerar outliers?",
+        "5. A renda per capita apresenta padrão espacial visível no território brasileiro?",
+    ]
+
+    ax.text(0.5, 0.93, titulo, transform=ax.transAxes,
+            fontsize=18, fontweight='bold', ha='center', va='top', color='#1a1a2e')
+
+    ax.text(0.5, 0.78, descricao, transform=ax.transAxes,
+            fontsize=11, ha='center', va='top', color='#333333',
+            style='italic', wrap=True)
+
+    ax.text(0.08, 0.58, "Perguntas norteadoras:", transform=ax.transAxes,
+            fontsize=12, fontweight='bold', color='#1a1a2e')
+
+    for i, pergunta in enumerate(perguntas):
+        ax.text(0.08, 0.50 - i * 0.09, pergunta, transform=ax.transAxes,
+                fontsize=11, color='#333333')
+
+    fig.patch.set_facecolor('#f0f4f8')
+    plt.tight_layout()
+    plt.show()
+
     # --- Gráfico 1: Qual a média de renda per capita por região? ---
     media_renda_regiao = dataset.groupby('regiao')['renda_per_capita'].mean()
     media_renda_regiao1 = dataset.groupby('regiao')['renda_per_capita'].agg(['mean', 'std'])
