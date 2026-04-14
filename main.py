@@ -24,7 +24,7 @@ mapa_estados_regiao = {
     'AM': 'norte',  'AC': 'norte',  'PA': 'norte', 'RR': 'norte', 'AP': 'norte', 'RO': 'norte',
     'AL': 'nordeste', 'BA': 'nordeste', 'CE': 'nordeste', 'MA': 'nordeste', 'PB': 'nordeste',
     'PE': 'nordeste', 'PI': 'nordeste', 'RN': 'nordeste', 'SE': 'nordeste',
-    'DF': 'centro-oeste', 'GO': 'centro-oeste', 'MT': 'centro-oeste', 'MS': 'centro-oeste',
+    'DF': 'centro-oeste', 'GO': 'centro-oeste', 'MT': 'centro-oeste', 'MS': 'centro-oeste', 'TO': 'norte',
     'ES': 'sudeste', 'MG': 'sudeste', 'RJ': 'sudeste', 'SP': 'sudeste',
     'PR': 'sul', 'RS': 'sul', 'SC': 'sul'
 }
@@ -94,10 +94,8 @@ dados = tratarArquivo(dados)
 
 # Analise de dados
 
-
 def visualizarDados(dataset):
 
-    # --- Slide 0: Apresentação ---
     fig, ax = plt.subplots(figsize=(12, 7))
     ax.axis('off')
 
@@ -109,11 +107,13 @@ def visualizarDados(dataset):
         "e construir uma base para modelos preditivos de renda a partir de localização geográfica."
     )
     perguntas = [
-        "1. Qual a média e variabilidade da renda per capita por região?",
-        "2. Como se distribui proporcionalmente a renda média entre as regiões?",
-        "3. Quais estados apresentam maior desigualdade interna de renda?",
-        "4. Como se distribui a renda típica por região, sem considerar outliers?",
-        "5. A renda per capita apresenta padrão espacial visível no território brasileiro?",
+        "1. Como cada região se posiciona em relação à média brasileira?",
+        "2. Existe equilíbrio de renda entre os estados de uma mesma região?",
+        "3. Qual a média e variabilidade da renda per capita por região?",
+        "4. Como se distribui proporcionalmente a renda média entre as regiões?",
+        "5. Quais estados apresentam maior desigualdade interna de renda?",
+        "6. Como se distribui a renda típica por região, sem considerar outliers?",
+        "7. A renda per capita apresenta padrão espacial visível no território brasileiro?",
     ]
 
     ax.text(0.5, 0.93, titulo, transform=ax.transAxes,
@@ -134,19 +134,48 @@ def visualizarDados(dataset):
     plt.tight_layout()
     plt.show()
 
-    # --- Gráfico 1: Qual a média de renda per capita por região? ---
-    media_renda_regiao = dataset.groupby('regiao')['renda_per_capita'].mean()
-    media_renda_regiao1 = dataset.groupby('regiao')['renda_per_capita'].agg(['mean', 'std'])
+    media_nacional = dataset['renda_per_capita'].mean()
+    media_regiao = dataset.groupby('regiao')['renda_per_capita'].mean().sort_values(ascending=False)
+    media_regiao1 = dataset.groupby('regiao')['renda_per_capita'].agg(['mean', 'std'])
+    desvio_renda = dataset.groupby('uf')['renda_per_capita'].std().sort_values(ascending=False)
 
-    media_renda_regiao1.plot(kind='bar')
+    # Gráfico 1: Regional vs Nacional
+    plt.figure(figsize=(10, 6))
+    media_regiao.plot(kind='bar', color='blue', edgecolor='black')
+    plt.axhline(media_nacional, color='red', linestyle='--', label=f'Média Nacional: R$ {media_nacional:.2f}')
+    plt.title('Renda Média por Região vs Média Nacional')
+    plt.ylabel('Renda Per Capita (R$)')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    # Gráfico 2: Drill-down Estados por Região
+    regioes = dataset['regiao'].dropna().unique()
+    fig, axes = plt.subplots(3, 2, figsize=(14, 12))
+    axes = axes.flatten()
+
+    for i, reg in enumerate(regioes):
+        if i < 6: # Limite de subplots
+            df_reg = dataset[dataset['regiao'] == reg]
+            m_reg = df_reg['renda_per_capita'].mean()
+            df_reg.groupby('uf')['renda_per_capita'].mean().sort_values().plot(kind='barh', ax=axes[i], color='teal')
+            axes[i].axvline(m_reg, color='orange', linestyle='--', alpha=0.7)
+            axes[i].set_title(f'Estados: {reg.upper()} (Linha: Média Reg.)')
+            axes[i].set_xlabel('R$')
+
+    plt.tight_layout()
+    plt.show()
+
+    # --- Gráfico 3: Qual a média de renda per capita por região? --
+    media_regiao1.plot(kind='bar')
     plt.title('Renda média e desvio padrao')
     plt.ylabel('Renda Per Capita (R$)')
     plt.xticks(rotation=45)
     plt.tight_layout()
     plt.show()
 
-    # --- Gráfico 2: Como se distribui a renda média entre as regiões? ---
-    media_renda_regiao.plot(
+    # --- Gráfico 4: Como se distribui a renda média entre as regiões? ---
+    media_regiao1['mean'].plot(
         kind='pie',
         autopct='%1.1f%%',
         startangle=90,
@@ -157,12 +186,8 @@ def visualizarDados(dataset):
     plt.axis('equal')
     plt.tight_layout()
     plt.show()
-
    
-    
-    desvio_renda = dataset.groupby('uf')['renda_per_capita'].std().sort_values(ascending=False)
-   
-    # --- Gráfico 3: Como evolui o desvio padrão de renda entre as regiões (ordem decrescente)? ---
+    # --- Gráfico 5: Como evolui o desvio padrão de renda entre as regiões (ordem decrescente)? ---
     plt.figure(figsize=(10, 5))
     plt.plot(desvio_renda.index, desvio_renda.values, marker='o', linestyle='-', color='teal', linewidth=2)
     plt.title('Desvio Padrão da Renda por Estado (Decrescente)', fontsize=14)
@@ -174,7 +199,7 @@ def visualizarDados(dataset):
     plt.show()
 
 
-    # --- Gráfico 4: Como se distribui a renda por estado ignorando os valores extremos? ---
+    # --- Gráfico 6: Como se distribui a renda por estado ignorando os valores extremos? ---
     dataset.boxplot(column='renda_per_capita', by='regiao', showfliers=False, figsize=(10, 6), grid=False)
     plt.title('Distribuição de Renda por Região (Sem Outliers)')
     plt.suptitle('')
@@ -182,7 +207,7 @@ def visualizarDados(dataset):
     plt.tight_layout()
     plt.show()
 
-    # --- Gráfico 5: Mapa geográfico - Renda Per Capita por Localização ---
+    # --- Gráfico 7: Mapa geográfico - Renda Per Capita por Localização ---
     fig, ax = plt.subplots(figsize=(10, 7))
     sc = ax.scatter(
         dataset['LON'], dataset['LAT'],
