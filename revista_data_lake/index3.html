@@ -1,0 +1,2128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Modelagem de Dados para Data Lake — 8-BIT EDITION</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #000000;
+      --bg-2:        #080808;
+      --bg-3:        #111111;
+      --border:      #ffffff;
+      --border-dim:  #444444;
+      --accent:      #00ffff;
+      --accent-2:    #ff00ff;
+      --accent-3:    #00ff00;
+      --text:        #ffffff;
+      --text-muted:  #cccccc;
+      --text-dim:    #666666;
+      --bronze:      #ff8800;
+      --silver:      #aaaaaa;
+      --gold:        #ffff00;
+      --sidebar-w:   280px;
+      --header-h:    58px;
+      --font:        'Press Start 2P', monospace;
+      --font-body:   'VT323', monospace;
+      --font-mono:   'VT323', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 22px;
+      line-height: 1.7;
+      image-rendering: pixelated;
+    }
+
+    /* ─── Pixel cursor ──────────────────────────────────────────────── */
+    a, button { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect x='0' y='0' width='8' height='8' fill='white'/%3E%3Crect x='8' y='8' width='8' height='8' fill='white'/%3E%3C/svg%3E") 0 0, pointer; }
+
+    /* ─── Scanline overlay ──────────────────────────────────────────── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.15) 2px,
+        rgba(0,0,0,0.15) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ─── Animations ────────────────────────────────────────────────── */
+    @keyframes blink       { 0%,100%{opacity:1}50%{opacity:0} }
+    @keyframes pixel-pulse { 0%,100%{transform:scale(1)}50%{transform:scale(1.04)} }
+    @keyframes fall        { 0%{transform:translateY(-20px);opacity:1}90%{opacity:1}100%{transform:translateY(120px);opacity:0} }
+    @keyframes march-right { 0%{background-position:0 0}100%{background-position:32px 0} }
+    @keyframes glitch-h    { 0%,100%{transform:translate(0,0)}20%{transform:translate(-2px,1px)}40%{transform:translate(2px,-1px)}60%{transform:translate(-1px,2px)} }
+    @keyframes scanflash   { 0%,100%{opacity:0}50%{opacity:1} }
+    @keyframes pixel-in    { from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)} }
+    @keyframes progress-step { from{width:var(--pw,0%)}to{width:var(--pw,0%)} }
+
+    /* ─── Top Header ────────────────────────────────────────────────── */
+    header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: var(--header-h);
+      background: var(--bg);
+      border-bottom: 4px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 100;
+      image-rendering: pixelated;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--font);
+      font-size: .55rem;
+      color: var(--accent);
+      letter-spacing: 1px;
+      text-shadow: 2px 2px 0 #006666;
+    }
+
+    .header-brand .pixel-icon {
+      display: grid;
+      grid-template-columns: repeat(5,6px);
+      grid-template-rows: repeat(5,6px);
+      gap: 1px;
+      flex-shrink: 0;
+    }
+
+    .pixel-icon span {
+      display: block;
+      width: 6px; height: 6px;
+    }
+
+    .pi-c { background: var(--accent); }
+    .pi-m { background: var(--accent-2); }
+    .pi-0 { background: transparent; }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-menu-toggle {
+      display: none;
+      background: none;
+      border: 2px solid var(--border);
+      color: var(--text);
+      padding: 6px 8px;
+      font-family: var(--font);
+      font-size: .5rem;
+      transition: background .1s;
+    }
+
+    .btn-menu-toggle:hover {
+      background: var(--border);
+      color: var(--bg);
+    }
+
+    /* ─── Progress Bar (pixel style) ───────────────────────────────── */
+    .progress-bar {
+      position: fixed;
+      top: var(--header-h);
+      left: 0;
+      height: 4px;
+      width: 0%;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--accent)    0px,  var(--accent)    8px,
+        var(--accent-2)  8px,  var(--accent-2)  16px,
+        var(--accent-3)  16px, var(--accent-3)  24px,
+        var(--gold)      24px, var(--gold)       32px
+      );
+      background-size: 32px 4px;
+      animation: march-right 0.4s steps(4, end) infinite;
+      z-index: 99;
+      transition: width .1s steps(10, end);
+    }
+
+    /* ─── Layout ────────────────────────────────────────────────────── */
+    .layout {
+      display: flex;
+      padding-top: var(--header-h);
+      min-height: 100vh;
+    }
+
+    /* ─── Sidebar ───────────────────────────────────────────────────── */
+    aside {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      position: fixed;
+      top: var(--header-h);
+      left: 0;
+      bottom: 0;
+      background: var(--bg-2);
+      border-right: 4px solid var(--border);
+      overflow-y: auto;
+      padding: 20px 0 40px;
+      transition: transform .2s steps(4, end);
+      z-index: 90;
+    }
+
+    aside::-webkit-scrollbar { width: 6px; }
+    aside::-webkit-scrollbar-track { background: var(--bg); }
+    aside::-webkit-scrollbar-thumb { background: var(--border-dim); }
+
+    .sidebar-label {
+      font-family: var(--font);
+      font-size: .5rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      padding: 0 16px 10px;
+      text-shadow: 1px 1px 0 #006666;
+    }
+
+    .nav-list { list-style: none; }
+
+    .nav-item a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      font-family: var(--font-body);
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      border-left: 4px solid transparent;
+      transition: all .1s steps(2, end);
+    }
+
+    .nav-item a:hover {
+      color: var(--accent);
+      background: rgba(0,255,255,.07);
+      border-left-color: var(--accent);
+    }
+
+    .nav-item a.active {
+      color: var(--accent);
+      background: rgba(0,255,255,.1);
+      border-left-color: var(--accent);
+    }
+
+    .nav-item a.active .nav-num {
+      animation: blink .8s step-end infinite;
+    }
+
+    .nav-item .nav-num {
+      font-family: var(--font);
+      font-size: .45rem;
+      color: var(--text-dim);
+      min-width: 22px;
+    }
+
+    .nav-divider {
+      height: 4px;
+      background: repeating-linear-gradient(
+        90deg, var(--border-dim) 0px, var(--border-dim) 4px, transparent 4px, transparent 8px
+      );
+      margin: 14px 16px;
+    }
+
+    /* ─── Main Content ──────────────────────────────────────────────── */
+    main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      padding: 48px 52px 80px;
+      max-width: 920px;
+    }
+
+    /* ─── Article Hero ──────────────────────────────────────────────── */
+    .article-hero {
+      margin-bottom: 56px;
+      padding-bottom: 40px;
+      border-bottom: 4px solid var(--border);
+      animation: pixel-in .4s steps(4, end) both;
+    }
+
+    /* Data-rain animation in hero */
+    .data-rain {
+      height: 80px;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 24px;
+      border: 2px solid var(--border-dim);
+    }
+
+    .data-rain .drop {
+      position: absolute;
+      font-family: var(--font);
+      font-size: .4rem;
+      color: var(--accent-3);
+      top: -20px;
+      animation: fall linear infinite;
+      text-shadow: 0 0 6px var(--accent-3);
+    }
+
+    .data-rain .drop:nth-child(1) { left: 8%;  animation-duration: 2s;   animation-delay: 0s;    }
+    .data-rain .drop:nth-child(2) { left: 22%; animation-duration: 1.6s; animation-delay: 0.4s;  }
+    .data-rain .drop:nth-child(3) { left: 40%; animation-duration: 2.2s; animation-delay: 0.1s;  }
+    .data-rain .drop:nth-child(4) { left: 58%; animation-duration: 1.8s; animation-delay: 0.7s;  }
+    .data-rain .drop:nth-child(5) { left: 75%; animation-duration: 2.4s; animation-delay: 0.3s;  }
+    .data-rain .drop:nth-child(6) { left: 90%; animation-duration: 1.5s; animation-delay: 0.9s;  }
+
+    .article-tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .tag {
+      font-family: var(--font);
+      font-size: .42rem;
+      padding: 4px 8px;
+      border: 2px solid;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .tag-blue   { color: var(--accent);   border-color: var(--accent);   background: rgba(0,255,255,.08);  }
+    .tag-purple { color: var(--accent-2); border-color: var(--accent-2); background: rgba(255,0,255,.08); }
+    .tag-cyan   { color: var(--accent-3); border-color: var(--accent-3); background: rgba(0,255,0,.08);   }
+
+    .article-hero h1 {
+      font-family: var(--font-body);
+      font-size: 2.8rem;
+      line-height: 1.4;
+      color: #ffffff;
+      margin-bottom: 20px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      text-shadow: 3px 3px 0 var(--accent-2);
+    }
+
+    .article-meta {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      font-family: var(--font-body);
+      font-size: 1.1rem;
+      color: var(--text-dim);
+      margin-bottom: 28px;
+    }
+
+    .article-meta span { display: flex; align-items: center; gap: 6px; }
+
+    .article-abstract {
+      background: var(--bg-2);
+      border: 4px solid var(--border-dim);
+      box-shadow: 6px 6px 0 var(--border-dim);
+      padding: 20px 22px;
+      font-family: var(--font-body);
+      font-size: 1.15rem;
+      line-height: 1.75;
+      color: var(--text-muted);
+    }
+
+    .article-abstract strong { color: var(--accent); font-family: var(--font); font-size: .65rem; }
+
+    /* ─── Sections ──────────────────────────────────────────────────── */
+    section {
+      margin-bottom: 64px;
+      scroll-margin-top: calc(var(--header-h) + 20px);
+    }
+
+    .section-number {
+      font-family: var(--font);
+      font-size: .45rem;
+      color: var(--accent);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      text-shadow: 1px 1px 0 #006666;
+    }
+
+    h2 {
+      font-family: var(--font-body);
+      font-size: 2.2rem;
+      color: var(--text);
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 4px solid var(--border);
+      line-height: 1.5;
+      text-shadow: 2px 2px 0 var(--accent-2);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    h3 {
+      font-family: var(--font-body);
+      font-size: 1.7rem;
+      color: var(--accent);
+      margin: 32px 0 14px;
+      line-height: 1.6;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    h4 {
+      font-family: var(--font);
+      font-size: .5rem;
+      color: var(--bg);
+      background: var(--accent-3);
+      display: inline-block;
+      padding: 3px 8px;
+      margin: 20px 0 10px;
+      letter-spacing: .5px;
+    }
+
+    p {
+      font-family: var(--font-body);
+      font-size: 1.35rem;
+      line-height: 1.85;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+
+    p strong {
+      font-family: var(--font-body);
+      font-size: 1.35rem;
+      font-weight: bold;
+      background-color: var(--text);
+      color: var(--bg);
+      padding: 0 4px;
+    }
+
+    /* ─── Callout Boxes ─────────────────────────────────────────────── */
+    .callout {
+      border: 4px solid;
+      padding: 16px 20px;
+      margin: 24px 0;
+      display: flex;
+      gap: 14px;
+      font-family: var(--font-body);
+      font-size: 1.3rem;
+      line-height: 1.75;
+      box-shadow: 6px 6px 0;
+    }
+
+    .callout-icon { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
+
+    .callout-info    { border-color: var(--accent);   box-shadow-color: var(--accent);   background: rgba(0,255,255,.05);  }
+    .callout-warn    { border-color: var(--gold);     box-shadow-color: var(--gold);     background: rgba(255,255,0,.05);  }
+    .callout-success { border-color: var(--accent-3); box-shadow-color: var(--accent-3); background: rgba(0,255,0,.05);    }
+    .callout-tip     { border-color: var(--accent-2); box-shadow-color: var(--accent-2); background: rgba(255,0,255,.05);  }
+
+    .callout-info    { box-shadow: 6px 6px 0 var(--accent);   }
+    .callout-warn    { box-shadow: 6px 6px 0 var(--gold);     }
+    .callout-success { box-shadow: 6px 6px 0 var(--accent-3); }
+    .callout-tip     { box-shadow: 6px 6px 0 var(--accent-2); }
+
+    .callout-info    .callout-body { color: var(--accent);   }
+    .callout-warn    .callout-body { color: var(--gold);     }
+    .callout-success .callout-body { color: var(--accent-3); }
+    .callout-tip     .callout-body { color: var(--accent-2); }
+
+    .callout-body strong { color: inherit; }
+
+    /* ─── Code Blocks ───────────────────────────────────────────────── */
+    .code-block {
+      background: var(--bg);
+      border: 4px solid var(--border);
+      box-shadow: 8px 8px 0 var(--border-dim);
+      margin: 20px 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* CRT scanlines on code blocks */
+    .code-block::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0,255,0,.03) 3px,
+        rgba(0,255,0,.03) 4px
+      );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: var(--bg-3);
+      border-bottom: 4px solid var(--border-dim);
+    }
+
+    .code-lang {
+      font-family: var(--font);
+      font-size: .42rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--accent-3);
+    }
+
+    .code-copy {
+      font-family: var(--font);
+      font-size: .38rem;
+      color: var(--text-dim);
+      background: none;
+      border: 2px solid var(--border-dim);
+      padding: 3px 7px;
+      transition: all .1s steps(1, end);
+    }
+
+    .code-copy:hover {
+      background: var(--border);
+      color: var(--bg);
+      border-color: var(--border);
+    }
+
+    pre {
+      padding: 18px;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 1.2rem;
+      line-height: 1.75;
+      color: #aaffaa;
+      position: relative;
+      z-index: 2;
+    }
+
+    pre::-webkit-scrollbar { height: 4px; }
+    pre::-webkit-scrollbar-thumb { background: var(--border-dim); }
+
+    .kw  { color: #ff6666; }
+    .str { color: #66ccff; }
+    .cmt { color: #556655; font-style: italic; }
+    .fn  { color: #ff88ff; }
+    .num { color: var(--gold); }
+    .typ { color: var(--bronze); }
+
+    /* ─── Inline Code ───────────────────────────────────────────────── */
+    code {
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      color: var(--accent-3);
+      background: rgba(0,255,0,.08);
+      border: 1px solid rgba(0,255,0,.3);
+      padding: 0 5px;
+    }
+
+    /* ─── Tables ────────────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; margin: 24px 0; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-body);
+      font-size: 1.05rem;
+      border: 4px solid var(--border);
+    }
+
+    thead th {
+      background: var(--border);
+      color: var(--bg);
+      font-family: var(--font);
+      font-size: .42rem;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    tbody tr {
+      border-bottom: 2px solid var(--border-dim);
+      transition: background .1s steps(1, end);
+    }
+
+    tbody tr:hover { background: rgba(0,255,255,.05); }
+
+    td {
+      padding: 10px 14px;
+      color: var(--text);
+      vertical-align: top;
+      line-height: 1.7;
+      font-size: 1.2rem;
+    }
+
+    td strong {
+      font-family: var(--font-body);
+      font-size: 1.2rem;
+      font-weight: bold;
+      background-color: var(--text);
+      color: var(--bg);
+      padding: 0 4px;
+    }
+    td code { font-family: var(--font-mono); font-size: 1.1rem; color: var(--accent); }
+
+    /* ─── Medallion Cards ───────────────────────────────────────────── */
+    .medallion-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .medallion-card {
+      border: 4px solid;
+      padding: 20px 16px;
+      text-align: center;
+      transition: transform .1s steps(2, end), box-shadow .1s steps(2, end);
+    }
+
+    .medallion-card:hover {
+      transform: translate(-4px, -4px);
+      box-shadow: 8px 8px 0 currentColor;
+    }
+
+    .medallion-card.bronze {
+      background: rgba(255,136,0,.06);
+      border-color: var(--bronze);
+    }
+
+    .medallion-card.silver {
+      background: rgba(170,170,170,.06);
+      border-color: var(--silver);
+    }
+
+    .medallion-card.gold {
+      background: rgba(255,255,0,.06);
+      border-color: var(--gold);
+    }
+
+    .medallion-icon { font-size: 2rem; margin-bottom: 12px; display: block; }
+
+    .medallion-card h3 {
+      font-family: var(--font);
+      font-size: .55rem;
+      font-weight: 800;
+      margin: 0 0 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: inherit;
+    }
+
+    .bronze h3 { color: var(--bronze); text-shadow: 2px 2px 0 #884400; }
+    .silver h3 { color: var(--silver); text-shadow: 2px 2px 0 #555555; }
+    .gold   h3 { color: var(--gold);   text-shadow: 2px 2px 0 #888800; }
+
+    .medallion-card p {
+      font-size: 1.2rem;
+      margin: 0;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    /* ─── 8-bit Pipeline Diagram ────────────────────────────────────── */
+    .pipeline-8bit {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 24px 0;
+      padding: 20px 16px;
+      border: 4px dashed var(--border-dim);
+      box-shadow: 8px 8px 0 var(--border-dim);
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .stage-box {
+      text-align: center;
+      padding: 14px 10px;
+      border: 4px solid;
+      font-family: var(--font);
+      font-size: .42rem;
+      min-width: 120px;
+      flex: 1;
+      transition: transform .1s steps(2, end);
+    }
+
+    .stage-box:hover { transform: translate(-3px,-3px); }
+
+    .stage-box.bronze { border-color: var(--bronze); color: var(--bronze); box-shadow: 6px 6px 0 #884400; }
+    .stage-box.silver { border-color: var(--silver); color: var(--silver); box-shadow: 6px 6px 0 #555555; }
+    .stage-box.gold   { border-color: var(--gold);   color: var(--gold);   box-shadow: 6px 6px 0 #888800; }
+
+    .stage-box .stage-data {
+      margin-top: 10px;
+      font-size: .9rem;
+      font-family: var(--font-mono);
+      height: 18px;
+    }
+
+    .stage-box.bronze .stage-data { color: var(--accent-3); animation: blink .6s step-end infinite; }
+    .stage-box.silver .stage-data { color: var(--silver); letter-spacing: 3px; }
+    .stage-box.gold   .stage-data { color: var(--gold); animation: pixel-pulse 1s step-end infinite; }
+
+    .pipe-arrow {
+      font-family: var(--font);
+      font-size: .6rem;
+      color: var(--accent);
+      animation: blink 1s step-end infinite;
+      flex-shrink: 0;
+    }
+
+    /* ─── Arch Diagram ──────────────────────────────────────────────── */
+    .arch-diagram {
+      background: var(--bg-2);
+      border: 4px solid var(--border-dim);
+      box-shadow: 8px 8px 0 var(--border-dim);
+      padding: 28px 20px;
+      margin: 24px 0;
+    }
+
+    .arch-layer {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 10px;
+    }
+
+    .arch-layer:last-child { margin-bottom: 0; }
+
+    .arch-arrow {
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 1.2rem;
+      padding: 4px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding-left: 32px;
+      animation: blink 1.2s step-end infinite;
+    }
+
+    .arch-box {
+      flex: 1;
+      border: 4px solid;
+      padding: 12px 16px;
+    }
+
+    .arch-box-title {
+      font-family: var(--font);
+      font-size: .5rem;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      margin-bottom: 6px;
+      line-height: 1.6;
+    }
+
+    .arch-box-desc {
+      font-family: var(--font-body);
+      font-size: 1.25rem;
+      color: var(--text);
+      line-height: 1.65;
+    }
+
+    .arch-box.ingestion  { border-color: var(--accent);   }
+    .arch-box.storage    { border-color: var(--gold);     }
+    .arch-box.processing { border-color: var(--accent-2); }
+    .arch-box.serving    { border-color: var(--accent-3); }
+    .arch-box.governance { border-color: var(--silver); border-style: dashed; }
+
+    .arch-box.ingestion  .arch-box-title { color: var(--accent);   }
+    .arch-box.storage    .arch-box-title { color: var(--gold);     }
+    .arch-box.processing .arch-box-title { color: var(--accent-2); }
+    .arch-box.serving    .arch-box-title { color: var(--accent-3); }
+    .arch-box.governance .arch-box-title { color: var(--silver);   }
+
+    /* ─── Feature Grid ──────────────────────────────────────────────── */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      margin: 24px 0;
+    }
+
+    .feature-card {
+      background: var(--bg-2);
+      border: 4px solid var(--border-dim);
+      padding: 18px;
+      box-shadow: 6px 6px 0 var(--border-dim);
+      transition: transform .1s steps(2, end), border-color .1s steps(1, end), box-shadow .1s steps(2, end);
+    }
+
+    .feature-card:hover {
+      border-color: var(--accent);
+      box-shadow: 6px 6px 0 var(--accent);
+      transform: translate(-3px,-3px);
+    }
+
+    .feature-card .fc-icon { font-size: 1.5rem; margin-bottom: 8px; display: block; }
+
+    .feature-card h4 {
+      background: none;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: .48rem;
+      padding: 0;
+      margin: 0 0 8px;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .feature-card p { font-size: 1.25rem; margin: 0; line-height: 1.7; color: var(--text); }
+
+    /* ─── Compare Grid ──────────────────────────────────────────────── */
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .compare-card {
+      border: 4px solid;
+      overflow: hidden;
+      box-shadow: 8px 8px 0;
+    }
+
+    .compare-card.pro { border-color: var(--accent-3); box-shadow-color: var(--accent-3); box-shadow: 8px 8px 0 var(--accent-3); }
+    .compare-card.con { border-color: #ff4444;         box-shadow: 8px 8px 0 #882222; }
+
+    .compare-card-header {
+      padding: 12px 16px;
+      font-family: var(--font);
+      font-size: .48rem;
+      letter-spacing: .5px;
+      line-height: 1.6;
+    }
+
+    .compare-card.pro .compare-card-header { background: rgba(0,255,0,.12);  color: var(--accent-3); border-bottom: 4px solid rgba(0,255,0,.3);  }
+    .compare-card.con .compare-card-header { background: rgba(255,0,0,.12);  color: #ff6666;         border-bottom: 4px solid rgba(255,0,0,.3); }
+
+    .compare-card ul { list-style: none; padding: 12px 16px; }
+
+    .compare-card ul li {
+      font-family: var(--font-body);
+      font-size: 1.25rem;
+      color: var(--text);
+      line-height: 1.7;
+      padding: 3px 0;
+      display: flex;
+      gap: 8px;
+    }
+
+    .compare-card ul li::before { flex-shrink: 0; font-family: var(--font); font-size: .5rem; }
+    .compare-card.pro ul li::before { content: '>'; color: var(--accent-3); }
+    .compare-card.con ul li::before { content: 'X'; color: #ff6666; }
+
+    /* ─── Practice List ─────────────────────────────────────────────── */
+    .practice-list {
+      list-style: none;
+      counter-reset: practice;
+      margin: 20px 0;
+    }
+
+    .practice-list li {
+      counter-increment: practice;
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      align-items: flex-start;
+      border: 2px solid var(--border-dim);
+      padding: 14px;
+      transition: border-color .1s steps(1, end), box-shadow .1s steps(2, end);
+    }
+
+    .practice-list li:hover {
+      border-color: var(--accent);
+      box-shadow: 6px 6px 0 var(--accent);
+    }
+
+    .practice-list li::before {
+      content: counter(practice, decimal-leading-zero);
+      font-family: var(--font);
+      font-size: .5rem;
+      color: var(--accent);
+      background: rgba(0,255,255,.1);
+      border: 2px solid var(--accent);
+      padding: 5px 7px;
+      min-width: 42px;
+      text-align: center;
+      margin-top: 2px;
+      flex-shrink: 0;
+      line-height: 1.8;
+    }
+
+    .practice-list li .pl-body { flex: 1; }
+
+    .practice-list li .pl-title {
+      font-family: var(--font);
+      font-size: .52rem;
+      color: var(--text);
+      margin-bottom: 6px;
+      line-height: 1.7;
+    }
+
+    .practice-list li .pl-desc {
+      font-family: var(--font-body);
+      font-size: 1.3rem;
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    /* ─── Badges ────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      font-family: var(--font);
+      font-size: .38rem;
+      padding: 2px 6px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      border: 2px solid;
+    }
+
+    .badge-green  { background: rgba(0,255,0,.1);   color: var(--accent-3); border-color: var(--accent-3); }
+    .badge-yellow { background: rgba(255,255,0,.1); color: var(--gold);     border-color: var(--gold);     }
+    .badge-red    { background: rgba(255,0,0,.1);   color: #ff6666;         border-color: #ff6666;         }
+
+    /* ─── References ────────────────────────────────────────────────── */
+    .ref-list { list-style: none; margin: 16px 0; }
+
+    .ref-list li {
+      font-family: var(--font-body);
+      font-size: 1.25rem;
+      color: var(--text);
+      padding: 10px 0;
+      border-bottom: 2px solid var(--border-dim);
+      line-height: 1.65;
+      display: flex;
+      gap: 14px;
+    }
+
+    .ref-num {
+      font-family: var(--font);
+      font-size: .42rem;
+      color: var(--accent);
+      min-width: 28px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .ref-list a { color: var(--accent-3); text-decoration: none; }
+    .ref-list a:hover { text-decoration: underline; color: var(--accent); }
+
+    /* ─── Footer ────────────────────────────────────────────────────── */
+    footer {
+      margin-left: var(--sidebar-w);
+      background: var(--bg-2);
+      border-top: 4px solid var(--border);
+      padding: 20px 52px;
+      font-family: var(--font);
+      font-size: .4rem;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      line-height: 2;
+    }
+
+    footer span:first-child { color: var(--accent); text-shadow: 1px 1px 0 #006666; }
+    footer span:last-child  { color: var(--accent-2); text-shadow: 1px 1px 0 #660066; }
+
+    /* ─── Back to Top ───────────────────────────────────────────────── */
+    #back-top {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 44px;
+      height: 44px;
+      background: var(--bg);
+      border: 4px solid var(--accent);
+      box-shadow: 6px 6px 0 var(--accent);
+      color: var(--accent);
+      font-family: var(--font);
+      font-size: .6rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s steps(2, end), transform .1s steps(2, end);
+    }
+
+    #back-top.show { opacity: 1; pointer-events: auto; }
+
+    #back-top:hover {
+      transform: translate(-3px,-3px);
+      background: var(--accent);
+      color: var(--bg);
+      box-shadow: 9px 9px 0 #006666;
+    }
+
+    /* ─── Overlay (mobile) ──────────────────────────────────────────── */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.85);
+      z-index: 85;
+    }
+    .overlay.show { display: block; }
+
+    /* ─── Responsive ────────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      main { padding: 32px 24px 60px; }
+      .medallion-grid { grid-template-columns: 1fr; }
+      .feature-grid   { grid-template-columns: 1fr; }
+      .compare-grid   { grid-template-columns: 1fr; }
+      .pipeline-8bit  { flex-direction: column; align-items: stretch; }
+      .pipe-arrow     { transform: rotate(90deg); text-align: center; }
+    }
+
+    @media (max-width: 720px) {
+      :root { --sidebar-w: 260px; }
+      aside { transform: translateX(-100%); }
+      aside.open { transform: translateX(0); }
+      main { margin-left: 0; padding: 24px 16px 60px; }
+      footer { margin-left: 0; padding: 16px; }
+      .article-hero h1 { font-size: 1.6rem; }
+      .btn-menu-toggle { display: flex; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Progress Bar -->
+<div class="progress-bar" id="progress"></div>
+
+<!-- Top Header -->
+<header>
+  <div class="header-brand">
+    <!-- Pixel art icon 5x5 -->
+    <div class="pixel-icon">
+      <span class="pi-0"></span><span class="pi-c"></span><span class="pi-c"></span><span class="pi-c"></span><span class="pi-0"></span>
+      <span class="pi-c"></span><span class="pi-m"></span><span class="pi-c"></span><span class="pi-m"></span><span class="pi-c"></span>
+      <span class="pi-c"></span><span class="pi-c"></span><span class="pi-c"></span><span class="pi-c"></span><span class="pi-c"></span>
+      <span class="pi-0"></span><span class="pi-c"></span><span class="pi-0"></span><span class="pi-c"></span><span class="pi-0"></span>
+      <span class="pi-0"></span><span class="pi-0"></span><span class="pi-c"></span><span class="pi-0"></span><span class="pi-0"></span>
+    </div>
+    DATA LAKE · MODELAGEM
+  </div>
+  <div class="header-actions">
+    <button class="btn-menu-toggle" id="menuToggle" aria-label="Menu">[MNU]</button>
+  </div>
+</header>
+
+<!-- Mobile Overlay -->
+<div class="overlay" id="overlay"></div>
+
+<!-- Layout -->
+<div class="layout">
+
+  <!-- ─── Sidebar ─────────────────────────────────────────────────── -->
+  <aside id="sidebar">
+    <div class="sidebar-label">&gt; sumário_</div>
+    <ul class="nav-list">
+      <li class="nav-item"><a href="#abstract"><span class="nav-num">00</span>Resumo</a></li>
+    </ul>
+    <div class="nav-divider"></div>
+    <ul class="nav-list">
+      <li class="nav-item"><a href="#s1"><span class="nav-num">01</span>Introdução</a></li>
+      <li class="nav-item"><a href="#s2"><span class="nav-num">02</span>O que é um Data Lake?</a></li>
+      <li class="nav-item"><a href="#s3"><span class="nav-num">03</span>Arquitetura Geral</a></li>
+      <li class="nav-item"><a href="#s4"><span class="nav-num">04</span>Arquitetura Medallion</a></li>
+      <li class="nav-item"><a href="#s5"><span class="nav-num">05</span>Schema-on-Read vs Write</a></li>
+      <li class="nav-item"><a href="#s6"><span class="nav-num">06</span>Formatos de Armazenamento</a></li>
+      <li class="nav-item"><a href="#s7"><span class="nav-num">07</span>Particionamento</a></li>
+      <li class="nav-item"><a href="#s8"><span class="nav-num">08</span>Catálogo e Metadados</a></li>
+      <li class="nav-item"><a href="#s9"><span class="nav-num">09</span>Qualidade e Governança</a></li>
+      <li class="nav-item"><a href="#s10"><span class="nav-num">10</span>Boas Práticas</a></li>
+      <li class="nav-item"><a href="#s11"><span class="nav-num">11</span>Conclusão</a></li>
+    </ul>
+    <div class="nav-divider"></div>
+    <ul class="nav-list">
+      <li class="nav-item"><a href="#refs"><span class="nav-num">§</span>Referências</a></li>
+    </ul>
+  </aside>
+
+  <!-- ─── Main ──────────────────────────────────────────────────────── -->
+  <main>
+
+    <!-- Hero -->
+    <div class="article-hero" id="abstract">
+
+      <!-- Data rain animation -->
+      <div class="data-rain">
+        <div class="drop">0110</div>
+        <div class="drop">JSON</div>
+        <div class="drop">.CSV</div>
+        <div class="drop">1001</div>
+        <div class="drop">AVRO</div>
+        <div class="drop">PARQ</div>
+      </div>
+
+      <div class="article-tags">
+        <span class="tag tag-blue">Engenharia de Dados</span>
+        <span class="tag tag-purple">Data Lake</span>
+        <span class="tag tag-cyan">Modelagem</span>
+      </div>
+
+      <h1>Como realizar a modelagem de dados para um Data Lake?</h1>
+
+      <div class="article-meta">
+        <span>&#x1F4C5; Abril de 2026</span>
+        <span>&#x231B; Leitura: ~22 min</span>
+        <span>&#x1F393; Nível: Intermediário / Avançado</span>
+      </div>
+
+      <div class="article-abstract">
+        <strong>// RESUMO —</strong> A modelagem de dados para um Data Lake difere substancialmente das abordagens
+        relacionais tradicionais. Enquanto bancos relacionais impõem estrutura no momento da escrita
+        (<em>schema-on-write</em>), um Data Lake armazena dados em sua forma bruta e aplica estrutura somente
+        durante a leitura (<em>schema-on-read</em>). Este artigo detalha as principais estratégias de modelagem —
+        incluindo a <strong>Arquitetura Medallion</strong> (Bronze, Silver, Gold), particionamento, formatos
+        colunares, catalogação de metadados e governança — fornecendo fundamentos teóricos, exemplos práticos
+        em SQL/Python e um conjunto de boas práticas consolidadas para equipes de dados.
+      </div>
+    </div>
+
+    <!-- ─── Seção 1 ────────────────────────────────────────────────── -->
+    <section id="s1">
+      <div class="section-number">// Seção 01</div>
+      <h2>Introdução</h2>
+
+      <p>
+        A explosão do volume, velocidade e variedade de dados — os famosos "3 Vs" do Big Data — tornou os
+        bancos de dados relacionais insuficientes para muitos cenários modernos de análise. Empresas passaram a
+        armazenar petabytes de logs, eventos de IoT, feeds de redes sociais, imagens e documentos em repositórios
+        centralizados chamados <strong>Data Lakes</strong>.
+      </p>
+      <p>
+        Entretanto, um Data Lake sem modelagem adequada rapidamente se transforma em um
+        <strong>Data Swamp</strong> — um pântano de dados inutilizáveis, sem rastreabilidade e com baixíssima
+        qualidade. A modelagem disciplinada é o que separa um repositório analítico valioso de um acúmulo
+        desordenado de arquivos.
+      </p>
+
+      <div class="callout callout-warn">
+        <span class="callout-icon">&#x26A0;&#xFE0F;</span>
+        <div class="callout-body">
+          <strong>DATA SWAMP ALERT:</strong> Estudos do Gartner indicam que até 85% dos projetos de Big Data falham
+          principalmente por falta de governança e modelagem adequadas, resultando em dados que não podem ser
+          encontrados, compreendidos ou confiados.
+        </div>
+      </div>
+
+      <p>
+        Este artigo apresenta um guia abrangente para modelagem de dados em Data Lakes, cobrindo desde os
+        fundamentos conceituais até a implementação prática com ferramentas modernas como Apache Spark,
+        Delta Lake, Apache Iceberg e AWS Glue Data Catalog.
+      </p>
+    </section>
+
+    <!-- ─── Seção 2 ────────────────────────────────────────────────── -->
+    <section id="s2">
+      <div class="section-number">// Seção 02</div>
+      <h2>O que é um Data Lake?</h2>
+
+      <p>
+        Um <strong>Data Lake</strong> é um repositório centralizado que permite armazenar todos os seus dados
+        estruturados, semiestruturados e não estruturados em qualquer escala. Ao contrário de um
+        <em>Data Warehouse</em>, os dados são armazenados em formato nativo — sem transformações prévias —
+        e só são estruturados no momento da análise.
+      </p>
+
+      <h3>// Data Lake vs Data Warehouse</h3>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Característica</th>
+              <th>Data Warehouse</th>
+              <th>Data Lake</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Estrutura dos Dados</strong></td>
+              <td>Estruturado (schema rígido)</td>
+              <td>Qualquer formato (raw)</td>
+            </tr>
+            <tr>
+              <td><strong>Momento do Schema</strong></td>
+              <td>Schema-on-write</td>
+              <td>Schema-on-read</td>
+            </tr>
+            <tr>
+              <td><strong>Custo de Armazenamento</strong></td>
+              <td>Alto (storage proprietário)</td>
+              <td>Baixo (object storage)</td>
+            </tr>
+            <tr>
+              <td><strong>Usuários</strong></td>
+              <td>Analistas de negócios</td>
+              <td>Engenheiros, cientistas de dados</td>
+            </tr>
+            <tr>
+              <td><strong>Escalabilidade</strong></td>
+              <td>Vertical / limitada</td>
+              <td>Horizontal / quase ilimitada</td>
+            </tr>
+            <tr>
+              <td><strong>Agilidade</strong></td>
+              <td>Transformações antecipadas</td>
+              <td>Ingestão rápida, transformação posterior</td>
+            </tr>
+            <tr>
+              <td><strong>Exemplos</strong></td>
+              <td>Snowflake, Redshift, BigQuery</td>
+              <td>S3 + Spark, ADLS + Delta Lake</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout-info">
+        <span class="callout-icon">&#x1F4A1;</span>
+        <div class="callout-body">
+          O conceito moderno de <strong>Data Lakehouse</strong> (Delta Lake, Apache Iceberg, Apache Hudi)
+          combina o melhor dos dois mundos: armazenamento barato de um Data Lake com as capacidades ACID
+          e de desempenho de um Data Warehouse.
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Seção 3 ────────────────────────────────────────────────── -->
+    <section id="s3">
+      <div class="section-number">// Seção 03</div>
+      <h2>Arquitetura Geral de um Data Lake</h2>
+
+      <p>
+        Independentemente da plataforma escolhida (AWS, Azure, GCP ou on-premises), um Data Lake bem estruturado
+        possui camadas funcionais bem definidas que cobrem todo o ciclo de vida dos dados.
+      </p>
+
+      <div class="arch-diagram">
+        <div class="arch-layer">
+          <div class="arch-box ingestion">
+            <div class="arch-box-title">[ INGESTÃO ]</div>
+            <div class="arch-box-desc">Batch (ETL), Streaming (Kafka, Kinesis), CDC (Debezium), APIs REST</div>
+          </div>
+        </div>
+        <div class="arch-arrow">&#x21E9;</div>
+        <div class="arch-layer">
+          <div class="arch-box storage">
+            <div class="arch-box-title">[ ARMAZENAMENTO ]</div>
+            <div class="arch-box-desc">Object Storage (S3, ADLS, GCS) · Parquet, ORC, Delta, Iceberg</div>
+          </div>
+        </div>
+        <div class="arch-arrow">&#x21E9;</div>
+        <div class="arch-layer">
+          <div class="arch-box processing">
+            <div class="arch-box-title">[ PROCESSAMENTO ]</div>
+            <div class="arch-box-desc">Apache Spark, Flink, dbt · Transformações Bronze → Silver → Gold</div>
+          </div>
+        </div>
+        <div class="arch-arrow">&#x21E9;</div>
+        <div class="arch-layer">
+          <div class="arch-box serving">
+            <div class="arch-box-title">[ CONSUMO ]</div>
+            <div class="arch-box-desc">BI Tools, ML Models, APIs, Ad-hoc SQL (Athena, Presto, Trino)</div>
+          </div>
+        </div>
+        <div class="arch-arrow" style="padding-left:0;margin-top:14px;"></div>
+        <div class="arch-layer">
+          <div class="arch-box governance">
+            <div class="arch-box-title">[ GOVERNANÇA &amp; CATÁLOGO — TRANSVERSAL ]</div>
+            <div class="arch-box-desc">Metadados, Linhagem, Qualidade de Dados, RBAC, Auditoria</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>// Separação entre Computação e Armazenamento</h3>
+      <p>
+        Uma das decisões arquiteturais mais relevantes em Data Lakes modernos é a
+        <strong>separação entre computação e armazenamento</strong>. Ao armazenar dados em object storage
+        (como o Amazon S3) e escalar clusters de processamento (Spark, EMR, Databricks) de forma independente,
+        as organizações eliminam o gargalo de recursos e otimizam custos drasticamente.
+      </p>
+    </section>
+
+    <!-- ─── Seção 4 ────────────────────────────────────────────────── -->
+    <section id="s4">
+      <div class="section-number">// Seção 04</div>
+      <h2>Arquitetura Medallion (Bronze · Silver · Gold)</h2>
+
+      <p>
+        A <strong>Arquitetura Medallion</strong>, popularizada pelo Databricks, é hoje o padrão de modelagem
+        mais adotado em Data Lakes. Ela organiza os dados em três camadas progressivas de qualidade e refinamento,
+        cada uma servindo a propósitos distintos.
+      </p>
+
+      <!-- 8-bit pipeline animation -->
+      <div class="pipeline-8bit">
+        <div class="stage-box bronze">
+          BRONZE<br/>[ RAW ]
+          <div class="stage-data">{#%@}</div>
+        </div>
+        <div class="pipe-arrow">&gt;&gt;&gt;</div>
+        <div class="stage-box silver">
+          SILVER<br/>[ CLEAN ]
+          <div class="stage-data">[===]</div>
+        </div>
+        <div class="pipe-arrow">&gt;&gt;&gt;</div>
+        <div class="stage-box gold">
+          GOLD<br/>[ READY ]
+          <div class="stage-data">$$$!</div>
+        </div>
+      </div>
+
+      <div class="medallion-grid">
+        <div class="medallion-card bronze">
+          <span class="medallion-icon">&#x1F949;</span>
+          <h3>Bronze</h3>
+          <p>Dados brutos, exatamente como chegaram da fonte. Nenhuma transformação é aplicada. Serve como
+          a "fonte de verdade" histórica e imutável.</p>
+        </div>
+        <div class="medallion-card silver">
+          <span class="medallion-icon">&#x1F948;</span>
+          <h3>Silver</h3>
+          <p>Dados limpos, validados e conformados. Deduplicados, tipados corretamente e com regras de
+          negócio básicas aplicadas. Prontos para exploração.</p>
+        </div>
+        <div class="medallion-card gold">
+          <span class="medallion-icon">&#x1F947;</span>
+          <h3>Gold</h3>
+          <p>Dados agregados e modelados para consumo final. Tabelas dimensionais, métricas de negócio,
+          features de ML. Alta performance de leitura.</p>
+        </div>
+      </div>
+
+      <h3>// Detalhamento da Camada Bronze</h3>
+      <p>
+        A camada Bronze armazena dados com <strong>fidelidade total à fonte</strong>. O objetivo é nunca perder
+        dados — mesmo que defeituosos — para possibilitar reprocessamento futuro.
+      </p>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Python · PySpark</span>
+          <button class="code-copy" onclick="copyCode(this)">[ copiar ]</button>
+        </div>
+        <pre><span class="cmt"># Ingestão Bronze: dados brutos sem transformação</span>
+<span class="kw">from</span> pyspark.sql <span class="kw">import</span> SparkSession
+<span class="kw">from</span> pyspark.sql.functions <span class="kw">import</span> current_timestamp, input_file_name
+
+spark = SparkSession.builder.appName(<span class="str">"bronze-ingest"</span>).getOrCreate()
+
+df = (
+    spark.readStream
+         .format(<span class="str">"kafka"</span>)
+         .option(<span class="str">"kafka.bootstrap.servers"</span>, <span class="str">"broker:9092"</span>)
+         .option(<span class="str">"subscribe"</span>, <span class="str">"orders-topic"</span>)
+         .load()
+)
+
+<span class="cmt"># Adiciona metadados de ingestão</span>
+df_bronze = df.withColumn(<span class="str">"_ingested_at"</span>, current_timestamp()) \
+              .withColumn(<span class="str">"_source_file"</span>, input_file_name())
+
+<span class="cmt"># Grava em Delta Lake na camada Bronze</span>
+(
+    df_bronze.writeStream
+             .format(<span class="str">"delta"</span>)
+             .outputMode(<span class="str">"append"</span>)
+             .option(<span class="str">"checkpointLocation"</span>, <span class="str">"s3://datalake/checkpoints/orders"</span>)
+             .start(<span class="str">"s3://datalake/bronze/orders"</span>)
+)</pre>
+      </div>
+
+      <h3>// Detalhamento da Camada Silver</h3>
+      <p>
+        A camada Silver aplica transformações de limpeza, validação de tipos, eliminação de duplicatas e
+        normalização de campos. Aqui as regras de negócio básicas são codificadas.
+      </p>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Python · PySpark</span>
+          <button class="code-copy" onclick="copyCode(this)">[ copiar ]</button>
+        </div>
+        <pre><span class="cmt"># Transformação Bronze → Silver</span>
+<span class="kw">from</span> pyspark.sql.functions <span class="kw">import</span> col, to_timestamp, trim, upper
+<span class="kw">from</span> delta.tables <span class="kw">import</span> DeltaTable
+
+<span class="cmt"># Lê da camada Bronze</span>
+df_raw = spark.read.format(<span class="str">"delta"</span>).load(<span class="str">"s3://datalake/bronze/orders"</span>)
+
+df_silver = (
+    df_raw
+    <span class="cmt"># Remover duplicatas</span>
+    .dropDuplicates([<span class="str">"order_id"</span>, <span class="str">"event_timestamp"</span>])
+    <span class="cmt"># Filtrar registros inválidos</span>
+    .filter(col(<span class="str">"order_id"</span>).isNotNull() &amp; col(<span class="str">"amount"</span>) > <span class="num">0</span>)
+    <span class="cmt"># Normalizar tipos</span>
+    .withColumn(<span class="str">"order_date"</span>,  to_timestamp(col(<span class="str">"order_date"</span>), <span class="str">"yyyy-MM-dd HH:mm:ss"</span>))
+    .withColumn(<span class="str">"customer_id"</span>, col(<span class="str">"customer_id"</span>).cast(<span class="str">"long"</span>))
+    .withColumn(<span class="str">"status"</span>,      upper(trim(col(<span class="str">"status"</span>))))
+    <span class="cmt"># Selecionar colunas relevantes</span>
+    .select(<span class="str">"order_id"</span>, <span class="str">"customer_id"</span>, <span class="str">"order_date"</span>,
+            <span class="str">"amount"</span>, <span class="str">"status"</span>, <span class="str">"_ingested_at"</span>)
+)
+
+<span class="cmt"># MERGE (upsert) para idempotência</span>
+silver_table = DeltaTable.forPath(spark, <span class="str">"s3://datalake/silver/orders"</span>)
+silver_table.alias(<span class="str">"target"</span>).merge(
+    df_silver.alias(<span class="str">"source"</span>),
+    <span class="str">"target.order_id = source.order_id"</span>
+).whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()</pre>
+      </div>
+
+      <h3>// Detalhamento da Camada Gold</h3>
+      <p>
+        A camada Gold contém dados prontos para consumo por ferramentas de BI, relatórios executivos e
+        modelos de Machine Learning. Aqui tipicamente aplicamos modelagem dimensional (Star Schema) ou
+        estruturas de features.
+      </p>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL · dbt</span>
+          <button class="code-copy" onclick="copyCode(this)">[ copiar ]</button>
+        </div>
+        <pre><span class="cmt">-- models/gold/fct_orders_daily.sql</span>
+<span class="cmt">-- Tabela fato: vendas diárias agregadas por cliente</span>
+
+<span class="kw">SELECT</span>
+    DATE_TRUNC(<span class="str">'day'</span>, o.order_date)  <span class="kw">AS</span> order_day,
+    c.segment                           <span class="kw">AS</span> customer_segment,
+    c.region                            <span class="kw">AS</span> region,
+    <span class="fn">COUNT</span>(DISTINCT o.order_id)          <span class="kw">AS</span> total_orders,
+    <span class="fn">SUM</span>(o.amount)                       <span class="kw">AS</span> gross_revenue,
+    <span class="fn">AVG</span>(o.amount)                       <span class="kw">AS</span> avg_order_value,
+    <span class="fn">COUNT</span>(DISTINCT o.customer_id)       <span class="kw">AS</span> unique_customers
+<span class="kw">FROM</span> {{ ref(<span class="str">'silver_orders'</span>) }}      <span class="kw">AS</span> o
+<span class="kw">JOIN</span> {{ ref(<span class="str">'silver_customers'</span>) }}  <span class="kw">AS</span> c
+    <span class="kw">ON</span> o.customer_id = c.customer_id
+<span class="kw">WHERE</span> o.status = <span class="str">'COMPLETED'</span>
+<span class="kw">GROUP BY</span> <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>
+<span class="kw">ORDER BY</span> order_day <span class="kw">DESC</span></pre>
+      </div>
+    </section>
+
+    <!-- ─── Seção 5 ────────────────────────────────────────────────── -->
+    <section id="s5">
+      <div class="section-number">// Seção 05</div>
+      <h2>Schema-on-Read vs Schema-on-Write</h2>
+
+      <p>
+        Uma das decisões fundamentais na modelagem de um Data Lake é quando e como o schema (estrutura) dos
+        dados é definido e aplicado.
+      </p>
+
+      <div class="compare-grid">
+        <div class="compare-card pro">
+          <div class="compare-card-header">[OK] SCHEMA-ON-READ — Vantagens</div>
+          <ul>
+            <li>Ingestão rápida sem pré-processamento</li>
+            <li>Flexibilidade para dados não estruturados</li>
+            <li>Permite exploração exploratória</li>
+            <li>Facilita onboarding de novas fontes</li>
+            <li>Suporta evoluções de schema retroativas</li>
+          </ul>
+        </div>
+        <div class="compare-card con">
+          <div class="compare-card-header">[!!] SCHEMA-ON-READ — Riscos</div>
+          <ul>
+            <li>Erros descobertos tardiamente (data swamp)</li>
+            <li>Custo computacional maior na leitura</li>
+            <li>Dificulta governança e catalogação</li>
+            <li>Pode gerar inconsistências entre consumidores</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout callout-tip">
+        <span class="callout-icon">&#x1F9E0;</span>
+        <div class="callout-body">
+          <strong>ABORDAGEM HÍBRIDA RECOMENDADA:</strong> Use <em>schema-on-read</em> na camada Bronze (dados
+          brutos) e aplique <em>schema enforcement</em> progressivo nas camadas Silver e Gold usando ferramentas
+          como <strong>Delta Lake</strong>, que suporta tanto evolução de schema quanto sua aplicação obrigatória.
+        </div>
+      </div>
+
+      <h3>// Schema Evolution no Delta Lake</h3>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Python · Delta Lake</span>
+          <button class="code-copy" onclick="copyCode(this)">[ copiar ]</button>
+        </div>
+        <pre><span class="cmt"># Schema evolution: adicionar coluna sem recriar tabela</span>
+df_new = spark.read.format(<span class="str">"delta"</span>).load(<span class="str">"s3://datalake/silver/orders"</span>)
+
+<span class="cmt"># Nova coluna adicionada pela fonte upstream</span>
+df_with_new_col = df_new.withColumn(<span class="str">"discount_pct"</span>, col(<span class="str">"discount"</span>) / col(<span class="str">"amount"</span>))
+
+<span class="cmt"># mergeSchema=True: adiciona automaticamente novas colunas</span>
+(
+    df_with_new_col.write
+                   .format(<span class="str">"delta"</span>)
+                   .option(<span class="str">"mergeSchema"</span>, <span class="str">"true"</span>)
+                   .mode(<span class="str">"append"</span>)
+                   .save(<span class="str">"s3://datalake/silver/orders"</span>)
+)
+
+<span class="cmt"># Enforcement: bloquear colunas inesperadas na Gold</span>
+spark.conf.set(<span class="str">"spark.databricks.delta.schema.autoMerge.enabled"</span>, <span class="str">"false"</span>)</pre>
+      </div>
+    </section>
+
+    <!-- ─── Seção 6 ────────────────────────────────────────────────── -->
+    <section id="s6">
+      <div class="section-number">// Seção 06</div>
+      <h2>Formatos de Armazenamento</h2>
+
+      <p>
+        A escolha do formato de arquivo tem impacto direto na performance de leitura, custo de armazenamento
+        e capacidade de evolução do schema. Formatos <strong>colunares</strong> são amplamente preferidos em
+        Data Lakes analíticos.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Formato</th>
+              <th>Tipo</th>
+              <th>Compressão</th>
+              <th>Predicate Pushdown</th>
+              <th>Schema Evolution</th>
+              <th>ACID</th>
+              <th>Ideal para</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>CSV</strong></td>
+              <td>Linha</td>
+              <td><span class="badge badge-red">Baixa</span></td>
+              <td><span class="badge badge-red">Não</span></td>
+              <td><span class="badge badge-red">Não</span></td>
+              <td><span class="badge badge-red">Não</span></td>
+              <td>Ingestão inicial / interoperabilidade</td>
+            </tr>
+            <tr>
+              <td><strong>JSON</strong></td>
+              <td>Linha</td>
+              <td><span class="badge badge-red">Baixa</span></td>
+              <td><span class="badge badge-red">Não</span></td>
+              <td><span class="badge badge-yellow">Parcial</span></td>
+              <td><span class="badge badge-red">Não</span></td>
+              <td>APIs, semi-estruturado</td>
+            </tr>
+            <tr>
+              <td><strong>Avro</strong></td>
+              <td>Linha</td>
+              <td><span class="badge badge-yellow">Média</span></td>
+              <td><span class="badge badge-red">Não</span></td>
+              <td><span class="badge badge-green">Sim</span></td>
+              <td><span class="badge badge-red">Não</span></td>
+              <td>Streaming / Kafka</td>
+            </tr>
+            <tr>
+              <td><strong>Parquet</strong></td>
+              <td>Colunar</td>
+              <td><span class="badge badge-green">Alta</span></td>
+              <td><span class="badge badge-green">Sim</span></td>
+              <td><span class="badge badge-yellow">Parcial</span></td>
+              <td><span class="badge badge-red">Não</span></td>
+              <td>Analytics em geral</td>
+            </tr>
+            <tr>
+              <td><strong>ORC</strong></td>
+              <td>Colunar</td>
+              <td><span class="badge badge-green">Alta</span></td>
+              <td><span class="badge badge-green">Sim</span></td>
+              <td><span class="badge badge-yellow">Parcial</span></td>
+              <td><span class="badge badge-red">Não</span></td>
+              <td>Hive / Hudi</td>
+            </tr>
+            <tr>
+              <td><code>Delta Lake</code></td>
+              <td>Colunar+Log</td>
+              <td><span class="badge badge-green">Alta</span></td>
+              <td><span class="badge badge-green">Sim</span></td>
+              <td><span class="badge badge-green">Sim</span></td>
+              <td><span class="badge badge-green">Sim</span></td>
+              <td>Lakehouse moderno</td>
+            </tr>
+            <tr>
+              <td><code>Iceberg</code></td>
+              <td>Colunar+Log</td>
+              <td><span class="badge badge-green">Alta</span></td>
+              <td><span class="badge badge-green">Sim</span></td>
+              <td><span class="badge badge-green">Sim</span></td>
+              <td><span class="badge badge-green">Sim</span></td>
+              <td>Multi-engine / neutralidade</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout-success">
+        <span class="callout-icon">&#x2705;</span>
+        <div class="callout-body">
+          <strong>RECOMENDAÇÃO:</strong> Para novos projetos, prefira <strong>Delta Lake</strong> ou
+          <strong>Apache Iceberg</strong> como formato padrão em todas as camadas. Eles oferecem transações ACID,
+          evolução de schema, time travel e performance comparável a um Data Warehouse para workloads analíticos.
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Seção 7 ────────────────────────────────────────────────── -->
+    <section id="s7">
+      <div class="section-number">// Seção 07</div>
+      <h2>Estratégias de Particionamento</h2>
+
+      <p>
+        O particionamento é uma das técnicas mais impactantes para a performance em Data Lakes. Ele organiza
+        os dados em subdiretórios físicos, permitindo que as engines de query pulem partições irrelevantes
+        (<strong>partition pruning</strong>).
+      </p>
+
+      <h3>// Particionamento por Data (mais comum)</h3>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Python · PySpark</span>
+          <button class="code-copy" onclick="copyCode(this)">[ copiar ]</button>
+        </div>
+        <pre><span class="cmt"># Estrutura no S3 gerada pelo particionamento:
+# s3://datalake/silver/orders/
+#   year=2024/month=01/day=15/part-0001.parquet
+#   year=2024/month=01/day=16/part-0001.parquet</span>
+
+df_silver.write \
+         .format(<span class="str">"delta"</span>) \
+         .partitionBy(<span class="str">"year"</span>, <span class="str">"month"</span>, <span class="str">"day"</span>) \
+         .mode(<span class="str">"overwrite"</span>) \
+         .save(<span class="str">"s3://datalake/silver/orders"</span>)
+
+<span class="cmt"># Leitura eficiente: só lê a partição necessária</span>
+df = spark.read.format(<span class="str">"delta"</span>) \
+               .load(<span class="str">"s3://datalake/silver/orders"</span>) \
+               .filter((<span class="str">"year = 2024"</span>) &amp; (<span class="str">"month = 1"</span>))
+<span class="cmt"># Spark lê apenas s3://datalake/silver/orders/year=2024/month=01/</span></pre>
+      </div>
+
+      <h3>// Erros Comuns de Particionamento</h3>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <span class="fc-icon">&#x1F525;</span>
+          <h4>Over-partitioning</h4>
+          <p>Particionar por colunas de alta cardinalidade (como <code>user_id</code>) gera milhões de
+          arquivos pequenos, degradando drasticamente a performance de listagem e leitura.</p>
+        </div>
+        <div class="feature-card">
+          <span class="fc-icon">&#x1F4E6;</span>
+          <h4>Under-partitioning</h4>
+          <p>Partições muito grandes impedem o partition pruning eficaz. Queries sempre lêem mais dados do
+          que o necessário, aumentando custo e latência.</p>
+        </div>
+        <div class="feature-card">
+          <span class="fc-icon">&#x2696;&#xFE0F;</span>
+          <h4>Tamanho ideal de arquivo</h4>
+          <p>Cada arquivo Parquet deve ter entre <strong>128MB e 512MB</strong>. Use <code>OPTIMIZE</code>
+          (Delta) ou <code>REWRITE DATA FILES</code> (Iceberg) periodicamente para compactar small files.</p>
+        </div>
+        <div class="feature-card">
+          <span class="fc-icon">&#x1F511;</span>
+          <h4>Chave de partição certa</h4>
+          <p>A chave ideal é aquela usada com frequência nos filtros WHERE das queries de consumo. Analise
+          os padrões de acesso antes de definir a estratégia.</p>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL · Delta Lake</span>
+          <button class="code-copy" onclick="copyCode(this)">[ copiar ]</button>
+        </div>
+        <pre><span class="cmt">-- Compactar small files e reordenar dados (Z-ordering)</span>
+<span class="cmt">-- Z-Order: organiza dados fisicamente para otimizar filtros multi-coluna</span>
+OPTIMIZE delta.`s3://datalake/silver/orders`
+ZORDER <span class="kw">BY</span> (customer_id, order_date);
+
+<span class="cmt">-- Remover arquivos antigos (vacuum)</span>
+VACUUM delta.`s3://datalake/silver/orders` RETAIN <span class="num">168</span> HOURS;</pre>
+      </div>
+    </section>
+
+    <!-- ─── Seção 8 ────────────────────────────────────────────────── -->
+    <section id="s8">
+      <div class="section-number">// Seção 08</div>
+      <h2>Catálogo de Dados e Metadados</h2>
+
+      <p>
+        Sem catalogação, um Data Lake torna-se innavegável. O <strong>catálogo de dados</strong> é o componente
+        que registra onde os dados estão, o que significam, quem os criou e qual é sua linhagem — permitindo
+        que qualquer pessoa na organização encontre e compreenda os dados disponíveis.
+      </p>
+
+      <h3>// Categorias de Metadados</h3>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Descrição</th>
+              <th>Exemplos</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Técnicos</strong></td>
+              <td>Schema, tipos, localização física, tamanho</td>
+              <td>Glue Catalog, Hive Metastore</td>
+            </tr>
+            <tr>
+              <td><strong>Operacionais</strong></td>
+              <td>Frequência de atualização, SLA, pipelines</td>
+              <td>Airflow, dbt docs</td>
+            </tr>
+            <tr>
+              <td><strong>Negócio</strong></td>
+              <td>Definições, dicionário de dados, owner</td>
+              <td>Atlan, DataHub, Alation</td>
+            </tr>
+            <tr>
+              <td><strong>Qualidade</strong></td>
+              <td>Perfis estatísticos, regras de validação</td>
+              <td>Great Expectations, dbt tests</td>
+            </tr>
+            <tr>
+              <td><strong>Linhagem</strong></td>
+              <td>Origem, transformações aplicadas, consumidores</td>
+              <td>OpenLineage, Marquez</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>// Registrando Tabelas no AWS Glue Catalog</h3>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Python · Boto3 + Glue</span>
+          <button class="code-copy" onclick="copyCode(this)">[ copiar ]</button>
+        </div>
+        <pre><span class="kw">import</span> boto3
+
+glue = boto3.client(<span class="str">"glue"</span>, region_name=<span class="str">"us-east-1"</span>)
+
+glue.create_table(
+    DatabaseName=<span class="str">"silver_db"</span>,
+    TableInput={
+        <span class="str">"Name"</span>: <span class="str">"orders"</span>,
+        <span class="str">"Description"</span>: <span class="str">"Pedidos limpos e validados - camada Silver"</span>,
+        <span class="str">"StorageDescriptor"</span>: {
+            <span class="str">"Columns"</span>: [
+                {<span class="str">"Name"</span>: <span class="str">"order_id"</span>,    <span class="str">"Type"</span>: <span class="str">"string"</span>,    <span class="str">"Comment"</span>: <span class="str">"PK único do pedido"</span>},
+                {<span class="str">"Name"</span>: <span class="str">"customer_id"</span>, <span class="str">"Type"</span>: <span class="str">"bigint"</span>,    <span class="str">"Comment"</span>: <span class="str">"FK para dim_customers"</span>},
+                {<span class="str">"Name"</span>: <span class="str">"order_date"</span>,   <span class="str">"Type"</span>: <span class="str">"timestamp"</span>, <span class="str">"Comment"</span>: <span class="str">"Data/hora do pedido (UTC)"</span>},
+                {<span class="str">"Name"</span>: <span class="str">"amount"</span>,       <span class="str">"Type"</span>: <span class="str">"double"</span>,    <span class="str">"Comment"</span>: <span class="str">"Valor total em BRL"</span>},
+            ],
+            <span class="str">"Location"</span>:        <span class="str">"s3://datalake/silver/orders"</span>,
+            <span class="str">"InputFormat"</span>:     <span class="str">"org.apache.hadoop.mapred.TextInputFormat"</span>,
+            <span class="str">"OutputFormat"</span>:    <span class="str">"org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat"</span>,
+            <span class="str">"SerdeInfo"</span>: {
+                <span class="str">"SerializationLibrary"</span>: <span class="str">"org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"</span>
+            },
+        },
+        <span class="str">"PartitionKeys"</span>: [
+            {<span class="str">"Name"</span>: <span class="str">"year"</span>,  <span class="str">"Type"</span>: <span class="str">"int"</span>},
+            {<span class="str">"Name"</span>: <span class="str">"month"</span>, <span class="str">"Type"</span>: <span class="str">"int"</span>},
+        ],
+        <span class="str">"Parameters"</span>: {
+            <span class="str">"classification"</span>:   <span class="str">"parquet"</span>,
+            <span class="str">"owner"</span>:            <span class="str">"data-engineering@empresa.com"</span>,
+            <span class="str">"update_frequency"</span>: <span class="str">"daily"</span>,
+        }
+    }
+)</pre>
+      </div>
+    </section>
+
+    <!-- ─── Seção 9 ────────────────────────────────────────────────── -->
+    <section id="s9">
+      <div class="section-number">// Seção 09</div>
+      <h2>Qualidade de Dados e Governança</h2>
+
+      <p>
+        Qualidade de dados não é um passo opcional — é um <strong>requisito arquitetural</strong>. Dados de
+        baixa qualidade comprometem decisões de negócio, modelos de ML e a confiança dos consumidores no
+        Data Lake.
+      </p>
+
+      <h3>// Dimensões de Qualidade</h3>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <span class="fc-icon">&#x2705;</span>
+          <h4>Completude</h4>
+          <p>Percentual de valores não nulos em campos obrigatórios. Ex: <code>order_id IS NOT NULL ≥ 99.9%</code></p>
+        </div>
+        <div class="feature-card">
+          <span class="fc-icon">&#x1F3AF;</span>
+          <h4>Unicidade</h4>
+          <p>Ausência de duplicatas em chaves primárias e de negócio. Detectada com contagens distintas.</p>
+        </div>
+        <div class="feature-card">
+          <span class="fc-icon">&#x1F517;</span>
+          <h4>Consistência</h4>
+          <p>Conformidade com regras de negócio entre tabelas. Ex: todo pedido deve ter um cliente válido.</p>
+        </div>
+        <div class="feature-card">
+          <span class="fc-icon">&#x23F0;</span>
+          <h4>Pontualidade</h4>
+          <p>Os dados chegam dentro do SLA esperado. Monitorado por <em>freshness checks</em> automáticos.</p>
+        </div>
+      </div>
+
+      <h3>// Validação com Great Expectations</h3>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Python · Great Expectations</span>
+          <button class="code-copy" onclick="copyCode(this)">[ copiar ]</button>
+        </div>
+        <pre><span class="kw">import</span> great_expectations <span class="kw">as</span> gx
+
+context = gx.get_context()
+
+<span class="cmt"># Define um conjunto de expectativas para a tabela Silver</span>
+suite = context.add_expectation_suite(<span class="str">"silver_orders_suite"</span>)
+
+validator = context.get_validator(
+    batch_request=...,
+    expectation_suite_name=<span class="str">"silver_orders_suite"</span>
+)
+
+<span class="cmt"># Completude</span>
+validator.expect_column_values_to_not_be_null(<span class="str">"order_id"</span>)
+validator.expect_column_values_to_not_be_null(<span class="str">"customer_id"</span>)
+
+<span class="cmt"># Unicidade</span>
+validator.expect_column_values_to_be_unique(<span class="str">"order_id"</span>)
+
+<span class="cmt"># Valores válidos</span>
+validator.expect_column_values_to_be_in_set(
+    <span class="str">"status"</span>, [<span class="str">"PENDING"</span>, <span class="str">"PROCESSING"</span>, <span class="str">"COMPLETED"</span>, <span class="str">"CANCELLED"</span>]
+)
+
+<span class="cmt"># Range numérico</span>
+validator.expect_column_values_to_be_between(
+    <span class="str">"amount"</span>, min_value=<span class="num">0.01</span>, max_value=<span class="num">1_000_000</span>
+)
+
+<span class="cmt"># Freshness: dados não podem ser mais antigos que 25h</span>
+validator.expect_column_max_to_be_between(
+    <span class="str">"order_date"</span>,
+    min_value=<span class="str">"now() - INTERVAL 25 HOURS"</span>
+)
+
+results = validator.validate()
+<span class="kw">if not</span> results[<span class="str">"success"</span>]:
+    raise <span class="typ">ValueError</span>(<span class="str">f"Qualidade de dados reprovada: {results}"</span>)</pre>
+      </div>
+
+      <h3>// Governança e Controle de Acesso</h3>
+
+      <p>
+        Um Data Lake multi-tenant exige controle fino de acesso por camada, domínio e sensibilidade dos dados.
+        A abordagem recomendada é <strong>RBAC + ABAC</strong> (controle baseado em papéis combinado com
+        atributos).
+      </p>
+
+      <div class="callout callout-warn">
+        <span class="callout-icon">&#x1F512;</span>
+        <div class="callout-body">
+          <strong>LGPD/GDPR ALERT:</strong> Dados pessoais identificáveis (PII) devem ser mascarados, pseudonimizados
+          ou criptografados na camada Bronze. Use técnicas como <em>tokenização</em> ou <em>data masking</em>
+          antes de propagar para camadas superiores. Nunca armazene dados sensíveis em texto claro nas camadas
+          Silver e Gold sem controle explícito de acesso.
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL · Unity Catalog (Databricks)</span>
+          <button class="code-copy" onclick="copyCode(this)">[ copiar ]</button>
+        </div>
+        <pre><span class="cmt">-- Criar catálogo e schema com namespacing por camada</span>
+<span class="kw">CREATE</span> CATALOG IF NOT EXISTS production;
+<span class="kw">CREATE</span> SCHEMA IF NOT EXISTS production.silver;
+<span class="kw">CREATE</span> SCHEMA IF NOT EXISTS production.gold;
+
+<span class="cmt">-- Conceder acesso granular</span>
+<span class="kw">GRANT</span> USE CATALOG <span class="kw">ON</span> CATALOG production <span class="kw">TO</span> `data-analysts`;
+<span class="kw">GRANT</span> SELECT <span class="kw">ON</span> SCHEMA production.gold <span class="kw">TO</span> `data-analysts`;
+
+<span class="cmt">-- Engenheiros têm acesso às camadas brutas</span>
+<span class="kw">GRANT</span> ALL PRIVILEGES <span class="kw">ON</span> SCHEMA production.silver <span class="kw">TO</span> `data-engineers`;
+
+<span class="cmt">-- Column-level masking para dados PII</span>
+<span class="kw">CREATE</span> FUNCTION mask_email(email <span class="typ">STRING</span>)
+<span class="kw">RETURN</span> <span class="kw">CASE</span>
+    <span class="kw">WHEN</span> is_member(<span class="str">'pii-access'</span>) <span class="kw">THEN</span> email
+    <span class="kw">ELSE</span> <span class="fn">CONCAT</span>(<span class="fn">LEFT</span>(email, <span class="num">2</span>), <span class="str">'***@***.com'</span>)
+<span class="kw">END</span>;</pre>
+      </div>
+    </section>
+
+    <!-- ─── Seção 10 ────────────────────────────────────────────────── -->
+    <section id="s10">
+      <div class="section-number">// Seção 10</div>
+      <h2>Boas Práticas de Modelagem</h2>
+
+      <ol class="practice-list">
+        <li>
+          <div class="pl-body">
+            <div class="pl-title">Defina o domínio antes da ferramenta</div>
+            <div class="pl-desc">Organize os dados por domínio de negócio (orders, customers, products) antes de
+            decidir tecnologias. A abordagem <strong>Data Mesh</strong> encapsula isso no conceito de
+            "domínios como produtos de dados" com contratos bem definidos.</div>
+          </div>
+        </li>
+        <li>
+          <div class="pl-body">
+            <div class="pl-title">Sempre adicione colunas de auditoria</div>
+            <div class="pl-desc">Toda tabela deve conter <code>_ingested_at</code>, <code>_updated_at</code>,
+            <code>_source_system</code> e <code>_pipeline_version</code>. Essas colunas permitem depuração,
+            reprocessamento e auditoria sem custo adicional de linhagem.</div>
+          </div>
+        </li>
+        <li>
+          <div class="pl-body">
+            <div class="pl-title">Projete para idempotência</div>
+            <div class="pl-desc">Pipelines devem poder ser reexecutados sem duplicar dados. Use operações
+            <code>MERGE/UPSERT</code> ao invés de <code>INSERT</code> simples. Isso é crítico para garantir
+            exatamente-uma-vez (<em>exactly-once</em>) em sistemas de streaming.</div>
+          </div>
+        </li>
+        <li>
+          <div class="pl-body">
+            <div class="pl-title">Documente contratos de dados (Data Contracts)</div>
+            <div class="pl-desc">Um <strong>Data Contract</strong> é um acordo formal entre produtor e consumidor
+            definindo schema, SLA de atualização, regras de qualidade e responsáveis. Ferramentas como
+            <em>Soda</em> e <em>dbt contracts</em> automatizam sua aplicação.</div>
+          </div>
+        </li>
+        <li>
+          <div class="pl-body">
+            <div class="pl-title">Monitore e alerte proativamente</div>
+            <div class="pl-desc">Implemente <em>freshness checks</em>, alertas de volume anômalo e dashboards
+            de qualidade antes de problemas chegarem aos consumidores finais. Ferramentas como
+            <strong>Monte Carlo</strong> e <strong>Bigeye</strong> oferecem observabilidade nativa.</div>
+          </div>
+        </li>
+        <li>
+          <div class="pl-body">
+            <div class="pl-title">Evite joins entre camadas diferentes</div>
+            <div class="pl-desc">Nunca realize joins entre tabelas Bronze e Gold em queries de produção.
+            Cada camada deve ser auto-suficiente para seu propósito. Joins cruzados introduzem dependências
+            difíceis de manter e gerenciar.</div>
+          </div>
+        </li>
+        <li>
+          <div class="pl-body">
+            <div class="pl-title">Use Time Travel para debugging e rollback</div>
+            <div class="pl-desc">Delta Lake e Iceberg oferecem <em>time travel</em> nativo. Use-o para
+            auditar estados históricos, comparar versões e reverter corrupções sem precisar de backups
+            manuais onerosos.</div>
+          </div>
+        </li>
+        <li>
+          <div class="pl-body">
+            <div class="pl-title">Trate o Data Lake como produto</div>
+            <div class="pl-desc">Aplique princípios de Product Management: defina usuários, colete feedback,
+            meça SLAs e itere. Um Data Lake sem ownership claro e métricas de uso torna-se um custo
+            sem retorno.</div>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ─── Seção 11 ────────────────────────────────────────────────── -->
+    <section id="s11">
+      <div class="section-number">// Seção 11</div>
+      <h2>Conclusão</h2>
+
+      <p>
+        A modelagem de dados para um Data Lake é uma disciplina que combina princípios de engenharia de software,
+        arquitetura de dados e governança corporativa. Ao contrário do que muitos imaginam, a flexibilidade
+        de um Data Lake não elimina a necessidade de modelagem — ela a torna ainda mais crítica.
+      </p>
+      <p>
+        A <strong>Arquitetura Medallion</strong> (Bronze → Silver → Gold) estabelece uma progressão clara de
+        qualidade e finalidade, enquanto formatos como <strong>Delta Lake</strong> e <strong>Apache Iceberg</strong>
+        eliminam as limitações históricas de sistemas de arquivos distribuídos, adicionando transações ACID,
+        evolução de schema e time travel.
+      </p>
+      <p>
+        O futuro aponta para o paradigma <strong>Data Lakehouse</strong> — onde a distinção entre Data Lake e
+        Data Warehouse desaparece — e para o <strong>Data Mesh</strong>, que descentraliza a responsabilidade
+        dos dados para os domínios de negócio, tratando dados como produtos de primeira classe.
+      </p>
+
+      <div class="callout callout-info">
+        <span class="callout-icon">&#x1F680;</span>
+        <div class="callout-body">
+          <strong>PRÓXIMOS PASSOS:</strong> Comece com um projeto piloto usando a Arquitetura
+          Medallion em uma única fonte de dados crítica. Estabeleça contratos de dados, implante validação
+          de qualidade com Great Expectations ou dbt tests, e expanda gradualmente para outras fontes,
+          mantendo sempre a governança como pilar central.
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Referências ───────────────────────────────────────────────── -->
+    <section id="refs">
+      <div class="section-number">// Referências</div>
+      <h2>Referências Bibliográficas</h2>
+
+      <ol class="ref-list">
+        <li>
+          <span class="ref-num">[1]</span>
+          <span>INMON, W. H. <em>Building the Data Warehouse</em>. 4ª ed. Wiley, 2005.</span>
+        </li>
+        <li>
+          <span class="ref-num">[2]</span>
+          <span>KIMBALL, R.; ROSS, M. <em>The Data Warehouse Toolkit: The Definitive Guide to Dimensional Modeling</em>. 3ª ed. Wiley, 2013.</span>
+        </li>
+        <li>
+          <span class="ref-num">[3]</span>
+          <span>DATABRICKS. <em>Medallion Architecture</em>. Disponível em: <a href="https://www.databricks.com/glossary/medallion-architecture" target="_blank" rel="noopener">databricks.com/glossary/medallion-architecture</a>, 2024.</span>
+        </li>
+        <li>
+          <span class="ref-num">[4]</span>
+          <span>DELTA LAKE. <em>Delta Lake Documentation</em>. Disponível em: <a href="https://docs.delta.io" target="_blank" rel="noopener">docs.delta.io</a>, 2024.</span>
+        </li>
+        <li>
+          <span class="ref-num">[5]</span>
+          <span>APACHE SOFTWARE FOUNDATION. <em>Apache Iceberg: A table format for huge analytic datasets</em>. Disponível em: <a href="https://iceberg.apache.org" target="_blank" rel="noopener">iceberg.apache.org</a>, 2024.</span>
+        </li>
+        <li>
+          <span class="ref-num">[6]</span>
+          <span>DEHGHANI, Z. <em>Data Mesh: Delivering Data-Driven Value at Scale</em>. O'Reilly Media, 2022.</span>
+        </li>
+        <li>
+          <span class="ref-num">[7]</span>
+          <span>GREAT EXPECTATIONS. <em>Great Expectations Documentation</em>. Disponível em: <a href="https://docs.greatexpectations.io" target="_blank" rel="noopener">docs.greatexpectations.io</a>, 2024.</span>
+        </li>
+        <li>
+          <span class="ref-num">[8]</span>
+          <span>dbt LABS. <em>dbt Documentation: Data Build Tool</em>. Disponível em: <a href="https://docs.getdbt.com" target="_blank" rel="noopener">docs.getdbt.com</a>, 2024.</span>
+        </li>
+        <li>
+          <span class="ref-num">[9]</span>
+          <span>AWS. <em>AWS Glue Data Catalog Documentation</em>. Amazon Web Services, 2024.</span>
+        </li>
+        <li>
+          <span class="ref-num">[10]</span>
+          <span>ARMBRUST, M. et al. <em>Delta Lake: High-Performance ACID Table Storage over Cloud Object Stores</em>. VLDB, 2020.</span>
+        </li>
+      </ol>
+    </section>
+
+  </main>
+</div>
+
+<!-- Footer -->
+<footer>
+  <span>DATA LAKE · MODELAGEM DE DADOS — ARTIGO TÉCNICO © 2026</span>
+  <span>ENGENHARIA DE DADOS · BIG DATA · DATA LAKEHOUSE</span>
+</footer>
+
+<!-- Back to Top -->
+<button id="back-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Voltar ao topo">&#x2191;</button>
+
+<script>
+  // ── Progress bar ────────────────────────────────────────────────
+  const progressBar = document.getElementById('progress');
+  window.addEventListener('scroll', () => {
+    const scrolled = window.scrollY;
+    const total    = document.documentElement.scrollHeight - window.innerHeight;
+    progressBar.style.width = total > 0 ? (scrolled / total * 100) + '%' : '0%';
+    document.getElementById('back-top').classList.toggle('show', scrolled > 400);
+  });
+
+  // ── Active nav link on scroll ───────────────────────────────────
+  const sections = document.querySelectorAll('section[id], div[id="abstract"]');
+  const navLinks  = document.querySelectorAll('.nav-item a');
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`.nav-item a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(s => observer.observe(s));
+
+  // ── Mobile sidebar toggle ───────────────────────────────────────
+  const sidebar  = document.getElementById('sidebar');
+  const overlay  = document.getElementById('overlay');
+  const menuBtn  = document.getElementById('menuToggle');
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('show');
+  }
+
+  menuBtn.addEventListener('click', () => {
+    const isOpen = sidebar.classList.toggle('open');
+    overlay.classList.toggle('show', isOpen);
+  });
+
+  overlay.addEventListener('click', closeSidebar);
+
+  sidebar.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => {
+      if (window.innerWidth <= 720) closeSidebar();
+    });
+  });
+
+  // ── Copy code ───────────────────────────────────────────────────
+  function copyCode(btn) {
+    const pre  = btn.closest('.code-block').querySelector('pre');
+    const text = pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '[ ok! ]';
+      setTimeout(() => btn.textContent = '[ copiar ]', 2000);
+    });
+  }
+</script>
+</body>
+</html>

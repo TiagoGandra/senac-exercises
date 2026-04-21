@@ -1,0 +1,155 @@
+================================================================================
+  PROMPT PARA GERAÇÃO DE INFOGRÁFICO
+  Artigo: "Como realizar a modelagem de dados para um Data Lake?"
+  Uso: Cole este texto integralmente em uma IA geradora de imagens/infográficos
+       (ex.: ChatGPT, Napkin.ai, Gamma.app, Canva AI)
+================================================================================
+
+ESTILO VISUAL — 8-BIT RETRO GAME (OBRIGATÓRIO):
+O infográfico deve ter estética de videogame 8-bit / pixel art dos anos 80.
+Não é moderno — é propositalmente retrô, pixelado e com visual de arcade.
+
+Fonte principal (títulos e labels): pixel font estilo "Press Start 2P" ou similar.
+Fonte secundária (textos, tabelas, descrições): "VT323" ou fonte monoespaçada pixel.
+Não use fontes sans-serif modernas como Inter ou IBM Plex.
+
+EFEITOS OBRIGATÓRIOS:
+- Efeito CRT/scanlines sobre o fundo (linhas horizontais semitransparentes)
+- Bordas em pixel art (4px sólidas, sem arredondamento — border-radius: 0)
+- Sombras "hard shadow" deslocadas sem blur (ex.: 4px 4px 0 #ff00ff)
+- Cursor piscante (█) ao lado dos títulos de seção
+- Ícones em pixel art (8x8 ou 16x16 sprites)
+- Setas entre blocos no estilo ► pixelado
+- Efeito "neon glow" nas bordas dos cards (box-shadow neon sem blur suave)
+- Números de seção com prefixo estilo terminal: [01], [02], [03]...
+
+INSTRUÇÃO GERAL:
+Crie um infográfico técnico vertical, formato A4 (1240 x 1754 px), estética
+8-bit retro game, fundo preto (#000000 ou #0a0a0a), texto branco puro (#ffffff).
+Divida em 5 blocos com bordas pixel sólidas, hierarquia clara e visual de tela
+de videogame antiga — sem gradientes suaves, sem sombras difusas, sem elementos
+arredondados. Tudo deve parecer renderizado em grade de pixels.
+
+-------------------------------------------------------------------------------
+TÍTULO PRINCIPAL (topo, destaque máximo):
+  "MODELAGEM DE DADOS PARA DATA LAKE"
+  Subtítulo: "Arquitetura, Formatos e Boas Práticas"
+  Tags/chips estilo crachá 8-bit: [ ENGENHARIA DE DADOS ] [ DATA LAKE ] [ MEDALLION ]
+  (bordas pixel, fundo colorido sólido, texto maiúsculo pixel font)
+  Alerta curto: ⚠️ Sem modelagem, Data Lake vira Data Swamp
+                Gartner: 85% dos projetos de Big Data falham por falta de governança.
+
+-------------------------------------------------------------------------------
+BLOCO 1 — DATA LAKE vs DATA WAREHOUSE (tabela comparativa 2 colunas)
+
+  Colunas: DATA WAREHOUSE | DATA LAKE
+    Schema          → Schema-on-write        | Schema-on-read
+    Custo storage   → Alto (proprietário)    | Baixo (object storage)
+    Usuários        → Analistas de negócio   | Engenheiros / Cientistas
+    Escalabilidade  → Vertical / limitada    | Horizontal / ilimitada
+    Exemplos        → Snowflake, Redshift    | S3+Spark, Delta Lake
+
+  Caixa de destaque:
+    💡 DATA LAKEHOUSE = Delta Lake · Iceberg · Hudi
+       → Armazenamento barato + ACID + performance de DW
+
+-------------------------------------------------------------------------------
+BLOCO 2 — ARQUITETURA MEDALLION (elemento central, maior destaque visual)
+  Título: "ARQUITETURA MEDALLION — O padrão mais adotado"
+
+  3 caixas horizontais conectadas por setas >>>:
+
+  🥉 BRONZE              >>>    🥈 SILVER              >>>    🥇 GOLD
+  ┌────────────────┐            ┌────────────────┐            ┌────────────────┐
+  │ RAW            │            │ CLEAN          │            │ READY          │
+  │ Dados brutos   │            │ Limpos e       │            │ Agregados para │
+  │ Imutável       │            │ Deduplicados   │            │ BI, ML, APIs   │
+  │ Fonte da       │            │ Tipados        │            │ Star Schema    │
+  │ verdade hist.  │            │ Validados      │            │ Feature Store  │
+  └────────────────┘            └────────────────┘            └────────────────┘
+  cor: laranja/bronze            cor: prata/cinza              cor: dourado
+
+-------------------------------------------------------------------------------
+BLOCO 3 — FORMATOS DE ARMAZENAMENTO (tabela com badges)
+  Título: "Qual formato escolher?"
+
+  Formato   | Tipo        | Compressão | ACID | Ideal para
+  CSV       | Linha       | ❌ Baixa   | ❌   | Ingestão inicial
+  Avro      | Linha       | 🟡 Média   | ❌   | Streaming / Kafka
+  Parquet   | Colunar     | ✅ Alta    | ❌   | Analytics geral
+  Delta Lake| Colunar+Log | ✅ Alta    | ✅   | Lakehouse moderno ⭐
+  Iceberg   | Colunar+Log | ✅ Alta    | ✅   | Multi-engine ⭐
+
+  Destaque: "Use Delta Lake ou Iceberg → ACID + Time Travel + evolução de schema"
+
+-------------------------------------------------------------------------------
+BLOCO 4 — 6 BOAS PRÁTICAS (lista numerada com ícones)
+  Título: "Boas Práticas de Modelagem"
+
+  1. 🗂️  Defina o domínio antes da ferramenta
+         Organize por orders, customers, products (Data Mesh)
+
+  2. 📋  Adicione colunas de auditoria
+         _ingested_at · _updated_at · _source_system
+
+  3. 🔄  Projete para idempotência
+         Use MERGE/UPSERT → exactly-once em streaming
+
+  4. 📝  Documente Data Contracts
+         Acordo produtor ↔ consumidor: schema + SLA + qualidade
+
+  5. 🔒  Proteja dados PII na Bronze
+         Mascarar antes de propagar (LGPD/GDPR)
+
+  6. ⏳  Use Time Travel para debugging
+         Delta / Iceberg: reverta corrupções sem backups manuais
+
+-------------------------------------------------------------------------------
+BLOCO 5 — VISÃO DE FUTURO (rodapé, 3 cards pequenos)
+
+  🏛️ DATA LAKEHOUSE          🌐 DATA MESH               🤖 ML + BI UNIFICADOS
+  DW + Data Lake em           Dados por domínio de        Feature Stores +
+  uma plataforma única        negócio como produtos       Serving layers unificados
+  Delta · Iceberg · Hudi      com contratos formais       em uma só plataforma
+
+-------------------------------------------------------------------------------
+RODAPÉ:
+  "Databricks Medallion · Delta Lake Docs · Apache Iceberg · Dehghani (2022)"
+  "Modelagem de Dados para Data Lake — Abril 2026"
+
+===============================================================================
+INSTRUÇÕES VISUAIS FINAIS — ESTILO 8-BIT:
+
+PALETA (cores sólidas neon, sem gradientes):
+  Fundo:    #000000 ou #0a0a0a
+  Texto:    #ffffff (branco puro)
+  Ciano:    #00ffff  → bordas e destaques principais
+  Magenta:  #ff00ff  → sombras hard shadow e títulos
+  Verde:    #00ff00  → badges positivos (✅ substituir por [OK])
+  Amarelo:  #ffff00  → avisos e destaques Gold/aviso
+  Laranja:  #ff8800  → card Bronze
+  Prata:    #c0c0c0  → card Silver
+
+TIPOGRAFIA:
+  Títulos de seção → "Press Start 2P" ou pixel font equivalente
+  Corpo / tabelas  → "VT323", "Courier New" ou pixel bitmap font
+  NÃO usar Inter, Roboto ou qualquer sans-serif moderno
+
+BADGES NAS TABELAS:
+  Substituir ✅ por [OK] em verde neon
+  Substituir ❌ por [--] em vermelho
+  Substituir 🟡 por [+-] em amarelo
+  (todos com bordas pixel e fonte monospace)
+
+SETAS E CONECTORES:
+  Usar ► ou >>>>> pixelados entre os cards do Medallion
+  Não usar setas curvas ou com ponta moderna
+
+EFEITOS CRT:
+  Overlay de scanlines horizontais com opacidade 0.08 sobre tudo
+  Leve vinheta escura nas bordas do infográfico
+
+FORMATO FINAL:
+  PNG — 150 dpi — tamanho A4 vertical (1240 x 1754 px)
+  Aspecto geral: tela de terminal dos anos 80 com informação estruturada
+===============================================================================

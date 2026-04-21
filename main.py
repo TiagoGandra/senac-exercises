@@ -87,6 +87,7 @@ def tratarArquivo(dataset):
     dataset = limparDados(dataset)
     dataset = criarColunas(dataset)
     dataset = codificarColunas(dataset)
+    verificarDados(dataset)
 
     return dataset
 

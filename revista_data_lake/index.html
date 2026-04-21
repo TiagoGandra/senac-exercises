@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Lake - 8-Bit Ultimate Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        /* =========================================
+           RESET E VARIÁVEIS GERAIS
+           ========================================= */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg-color: #000000;
+            --fg-color: #FFFFFF;
+            --font-title: 'Press Start 2P', monospace;
+            --font-body: 'VT323', monospace;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--fg-color);
+            font-family: var(--font-body);
+            font-size: 22px;
+            line-height: 1.5;
+            padding: 20px;
+        }
+
+        /* =========================================
+           TYPOGRAPHY
+           ========================================= */
+        h1, h2, h3, h4 {
+            font-family: var(--font-title);
+            text-transform: uppercase;
+            line-height: 1.4;
+        }
+
+        h1 {
+            font-size: 24px;
+            text-align: center;
+            margin: 40px 0;
+            border-bottom: 4px solid var(--fg-color);
+            padding-bottom: 20px;
+            display: inline-block;
+        }
+
+        .header-container { text-align: center; }
+
+        h2 {
+            font-size: 16px;
+            margin: 60px 0 30px 0;
+            text-align: center;
+        }
+
+        h3 {
+            font-size: 14px;
+            margin-bottom: 15px;
+            border-bottom: 4px solid var(--fg-color);
+            padding-bottom: 10px;
+            display: inline-block;
+        }
+        
+        h4 {
+            font-size: 12px;
+            margin: 15px 0 5px 0;
+            color: #000;
+            background: #FFF;
+            padding: 4px;
+            display: inline-block;
+        }
+
+        p { margin-bottom: 15px; text-align: justify; }
+
+        strong {
+            font-weight: bold;
+            background-color: var(--fg-color);
+            color: var(--bg-color);
+            padding: 0 4px;
+        }
+
+        ul { list-style: none; padding-left: 20px; margin-bottom: 15px; }
+        li { position: relative; margin-bottom: 10px; }
+        li::before {
+            content: '>';
+            font-family: var(--font-title);
+            font-size: 10px;
+            position: absolute;
+            left: -20px;
+            top: 6px;
+        }
+        ul ul { margin-top: 10px; padding-left: 25px; }
+        ul ul li::before { content: '■'; top: 4px; }
+
+        /* =========================================
+           LAYOUT: GRIDS E CARTÕES
+           ========================================= */
+        #game-world {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            border: 4px solid var(--fg-color);
+            padding: 25px;
+            background-color: var(--bg-color);
+            box-shadow: 8px 8px 0px var(--fg-color);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            transform: translate(-4px, -4px);
+            box-shadow: 12px 12px 0px var(--fg-color);
+        }
+
+        .card-intro {
+            border: none;
+            box-shadow: none;
+            text-align: center;
+            max-width: 900px;
+            margin: 0 auto 40px auto;
+            font-size: 26px;
+        }
+
+        .card-special {
+            border: 4px double var(--fg-color);
+            padding: 30px;
+            text-align: center;
+            margin-top: 60px;
+            margin-bottom: 60px;
+            box-shadow: inset 0 0 0 4px #000, inset 0 0 0 8px #FFF;
+        }
+
+        /* =========================================
+           ANIMAÇÕES CSS (ESTILO 8-BIT)
+           ========================================= */
+        
+        /* 1. Animação da Chuva de Dados */
+        .data-lake-animation {
+            height: 150px;
+            border: 4px solid var(--fg-color);
+            margin: 20px auto 40px auto;
+            position: relative;
+            overflow: hidden;
+            background: var(--bg-color);
+            max-width: 600px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .lake-surface {
+            width: 100%;
+            text-align: center;
+            font-family: var(--font-title);
+            font-size: 16px;
+            padding: 10px;
+            background: var(--fg-color);
+            color: var(--bg-color);
+            z-index: 2;
+            animation: wave 2s steps(2, end) infinite;
+        }
+
+        .drop {
+            position: absolute;
+            font-family: var(--font-title);
+            font-size: 14px;
+            color: var(--fg-color);
+            top: -20px;
+            animation: fall linear infinite;
+        }
+
+        .drop:nth-child(1) { left: 10%; animation-duration: 2s; animation-delay: 0s; }
+        .drop:nth-child(2) { left: 30%; animation-duration: 1.5s; animation-delay: 0.5s; }
+        .drop:nth-child(3) { left: 50%; animation-duration: 2.2s; animation-delay: 0.2s; }
+        .drop:nth-child(4) { left: 70%; animation-duration: 1.8s; animation-delay: 0.8s; }
+        .drop:nth-child(5) { left: 90%; animation-duration: 2.5s; animation-delay: 0.1s; }
+
+        @keyframes fall {
+            0% { transform: translateY(-10px); opacity: 1; }
+            90% { transform: translateY(110px); opacity: 1; }
+            100% { transform: translateY(120px); opacity: 0; }
+        }
+
+        @keyframes wave {
+            0% { transform: translateX(-2px); }
+            50% { transform: translateX(2px); }
+            100% { transform: translateX(-2px); }
+        }
+
+        /* 2. Animação da Esteira Medalhão */
+        .pipeline-animation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 40px auto;
+            padding: 20px;
+            border: 4px dashed var(--fg-color);
+            max-width: 900px;
+            font-family: var(--font-title);
+            font-size: 12px;
+        }
+
+        .stage-box {
+            text-align: center;
+            padding: 15px;
+            border: 2px solid var(--fg-color);
+            width: 140px;
+            background: var(--bg-color);
+        }
+
+        .data-visual {
+            margin-top: 15px;
+            font-size: 16px;
+            height: 20px;
+        }
+
+        .arrow-flow {
+            font-size: 20px;
+            animation: blink 1s step-end infinite;
+        }
+
+        .bronze .data-visual { animation: glitch 0.5s steps(2, end) infinite; }
+        .silver .data-visual { letter-spacing: 2px; }
+        .gold .data-visual { animation: shine 1s steps(2, end) infinite; color: #000; background-color: #FFF;}
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        @keyframes glitch {
+            0% { content: "{#%}"; }
+            50% { content: "[@!]"; }
+            100% { content: "&*?"; }
+        }
+
+        @keyframes shine {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .card { box-shadow: 4px 4px 0px var(--fg-color); }
+            .card:hover { transform: none; box-shadow: 4px 4px 0px var(--fg-color); }
+            h1 { font-size: 16px; }
+            .pipeline-animation { flex-direction: column; gap: 20px; }
+            .arrow-flow { transform: rotate(90deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-world">
+        <div class="header-container">
+            <h1>Data Lake<br><br>O Guia Definitivo</h1>
+        </div>
+
+        <div class="card-intro">
+            <p>Para entender um Data Lake, você precisa fixar quatro conceitos fundamentais antes de avançar para a modelagem:</p>
+        </div>
+
+        <div class="data-lake-animation">
+            <div class="drop">0110</div>
+            <div class="drop">1001</div>
+            <div class="drop">.JSON</div>
+            <div class="drop">.CSV</div>
+            <div class="drop">IMG_</div>
+            <div class="lake-surface">~~~ DATA LAKE BRUTO ~~~</div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <h3>Repositório Centralizado</h3>
+                <p>É um ambiente de armazenamento único que guarda dados exatamente como eles chegam das fontes originais, sem transformações prévias.</p>
+            </div>
+            
+            <div class="card">
+                <h3>Múltiplos Formatos</h3>
+                <p>Diferente de bancos tradicionais, o Data Lake armazena dados estruturados (tabelas), semiestruturados (JSON, XML, logs) e não estruturados (imagens, vídeos, PDFs).</p>
+            </div>
+
+            <div class="card">
+                <h3>Schema-on-Read</h3>
+                <p>A principal quebra de paradigma. Você não define a estrutura antes de gravar (Schema-on-Write). Você salva o dado rapidamente e só aplica a estrutura no momento de lê-lo.</p>
+            </div>
+
+            <div class="card">
+                <h3>Desacoplamento</h3>
+                <p>Na nuvem, o disco onde os dados ficam guardados é separado das máquinas que processam as análises. Isso permite guardar petabytes gastando muito pouco.</p>
+            </div>
+        </div>
+
+        <h2>Modelagem Lógica (Arquitetura Medalhão)</h2>
+        <div class="card-intro">
+            <p>A ideia de que o lago "guarda dados sem estrutura" gera o erro de achar que não existe modelagem. Isso cria um <strong>Data Swamp</strong> (pântano inavegável).</p>
+            <p>A modelagem não desaparece; ela é dividida em zonas progressivas de processamento.</p>
+        </div>
+
+        <div class="pipeline-animation">
+            <div class="stage-box bronze">
+                BRONZE (RAW)
+                <div class="data-visual">{#%}</div>
+            </div>
+            <div class="arrow-flow"> >>> </div>
+            <div class="stage-box silver">
+                PRATA (ENRICHED)
+                <div class="data-visual">[==]</div>
+            </div>
+            <div class="arrow-flow"> >>> </div>
+            <div class="stage-box gold">
+                OURO (CURATED)
+                <div class="data-visual">$$$</div>
+            </div>
+        </div>
+
+        <div class="grid-3">
+            <div class="card">
+                <h3>1. Bronze</h3>
+                <p>A <strong>zona de aterrissagem</strong>. O objetivo é capturar o histórico e a linhagem, não o negócio.</p>
+                <h4>Estrutura</h4>
+                <p>Salvos como vieram (JSON, CSV, txt).</p>
+                <h4>Modelagem / Partição</h4>
+                <p>Organizados em diretórios por data (ex: <code>ano=2026/mes=04/dia=21/</code>).</p>
+                <h4>Regra de Ouro</h4>
+                <p><strong>Imutáveis.</strong> São a verdade absoluta da extração para reprocessamentos futuros.</p>
+            </div>
+            
+            <div class="card">
+                <h3>2. Prata</h3>
+                <p>Onde a verdadeira engenharia começa. Foco em <strong>padronização e qualidade</strong>.</p>
+                <h4>Limpeza e Tipagem</h4>
+                <p>Conversão para colunar (Parquet) e tipos forçados (datetime em vez de string).</p>
+                <h4>Mentalidade de QA</h4>
+                <p>Testes rigorosos! Validar esquemas, tratar nulos e eliminar duplicatas usando Pandas ou PySpark.</p>
+                <h4>Modelagem Lógica</h4>
+                <p>Uso de 3ª Forma Normal ou Data Vault para entidades consistentes, sem viés analítico.</p>
+            </div>
+            
+            <div class="card">
+                <h3>3. Ouro</h3>
+                <p>A camada de apresentação, modelada especificamente para o consumo final.</p>
+                <h4>Modelagem Dimensional</h4>
+                <p>Uso clássico de Kimball (Star Schemas: Fatos e Dimensões) para focar em performance de consultas de BI.</p>
+                <h4>One-Big-Table (OBT)</h4>
+                <p>Tabelas largas e desnormalizadas com todas as features prontas para treinar algoritmos de IA/ML.</p>
+                <h4>Agregações</h4>
+                <p>Métricas pré-calculadas e regras de negócio pesadas.</p>
+            </div>
+        </div>
+
+        <h2>Decisões Críticas (Modelagem Física)</h2>
+        <div class="card-intro">
+            <p>Além da separação em camadas lógicas, a forma como os arquivos são fisicamente distribuídos define o sucesso do projeto.</p>
+        </div>
+
+        <div class="grid-3">
+            <div class="card">
+                <h3>Formatos de Arquivo</h3>
+                <p>A transição de CSV/JSON (Bronze) para <strong>Parquet</strong> (Prata/Ouro) é vital.</p>
+                <p>O Parquet é colunar: consultas analíticas (que leem poucas colunas de milhões de linhas) rodam muito mais rápido e custam menos.</p>
+            </div>
+            <div class="card">
+                <h3>Open Table Formats</h3>
+                <p>A evolução para o conceito de <strong>Lakehouse</strong>.</p>
+                <p>Tecnologias como Delta Lake, Apache Iceberg e Hudi adicionam metadados sobre o Parquet, permitindo transações ACID (UPDATE, DELETE, MERGE) e controle de versão.</p>
+            </div>
+            <div class="card">
+                <h3>Particionamento</h3>
+                <p>Evite o <strong>Small Files Problem</strong> (milhares de arquivos minúsculos que destroem a performance).</p>
+                <p>Particionar dados por critérios lógicos (como data) garante o <strong>Partition Pruning</strong>, fazendo o motor ignorar pastas irrelevantes na busca.</p>
+            </div>
+        </div>
+
+        <div class="card-special">
+            <h2>Governança & O Funil de Qualidade</h2>
+            <p>Em resumo, modelar para um Data Lake é construir um funil de qualidade e estrutura: você aceita o <strong>caos controlado na entrada</strong> (Bronze), estabelece o <strong>rigor e a validação no meio</strong> (Prata), e entrega a <strong>precisão analítica na ponta</strong> (Ouro).</p>
+            <br>
+            <p>Por fim, isso exige um <strong>Catálogo de Dados</strong>. Ferramentas de governança são usadas para mapear os metadados (o que cada arquivo significa, quem é o dono, qual a linhagem), garantindo que a modelagem seja documentada, descobrível e segura.</p>
+        </div>
+
+    </div>
+
+</body>
+</html>
