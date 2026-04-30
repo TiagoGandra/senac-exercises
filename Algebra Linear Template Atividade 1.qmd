@@ -1,0 +1,88 @@
+---
+title: "Álgebra Linear - Atividade 1"
+subtitle: Lições na linguagem R
+author:
+  - name: TIAGO VAZ GANDRA
+    email: TIAGO62200226@EDU.SENAC.GOV.BR
+    affiliation: 
+      - id: Faculdade SENAC DF
+        name: Faculdade SENAC DF
+date: last-modified
+date-format: "DD/MM/YYYY"
+format:
+  html:
+    code-fold: show
+    page-layout: full
+    code-summary: "Ocultar/mostrar"
+    code-copy: true
+    number-sections: false
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    toc-title: Sumário
+    title-block-banner: "#057bb4"
+    embed-resources: true
+    css: styles.css
+  pdf:
+    include-in-header: 
+      text: |
+execute:
+  warning: false
+  echo: true
+  eval: true
+  message: false
+editor: source
+editor_options: 
+  chunk_output_type: inline
+reference-location: margin
+---
+
+
+## Atividade 1: Operações com Vetores
+
+```{r}
+# Criando os vetores u e v
+
+u <- c(1,2,3)
+u
+v <- c(4,5,6)
+v
+
+# SOmando os vetores u e v
+
+soma_u_v <- u + v
+soma_u_v
+
+# Multiplicando vetor por escalar
+
+lambda <- 3
+multiplica_escalar <- lambda*u
+multiplica_escalar
+
+# Calculando o produto interno
+produto_interno <- sum(u*v)
+produto_interno
+
+# Calculando a norma do vetor
+norma_u <- sqrt(sum(u^2))
+norma_u
+```
+
+
+
+## Atividade 2: calculo de autovalores e autovetor da matriz A
+
+
+```{r}
+# Criando a matriz A
+A <- matrix(c(5,9,2,2), nrow=2, byrow=TRUE)
+A
+
+# Calculando os autovalores de A
+autovalores_A <- eigen(A)
+autovalores_A
+
+```
+
+
+

@@ -1,0 +1,77 @@
+---
+title: "Álgebra Matricial"
+subtitle: Lições na linguagem R
+author:
+  - name: TIAGO VAZ GANDRA
+    email: tiagogandrati@gmail.com
+    affiliation: 
+      - id: Faculdade SENAC DF
+        name: Faculdade SENAC DF
+date: last-modified
+date-format: "DD/MM/YYYY"
+format:
+  html:
+    code-fold: show
+    code-summary: "Ocultar/mostrar"
+    code-copy: true
+    number-sections: false
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    toc-title: Sumário
+    title-block-banner: "#057bb4"
+    embed-resources: true
+    css: styles.css
+  pdf:
+    include-in-header: 
+      text: |
+execute:
+  warning: false
+  echo: true
+  eval: true
+  message: false
+editor: source
+editor_options: 
+  chunk_output_type: inline
+reference-location: margin
+---
+
+```{r}
+options(scipen=999)
+options(digits=2)
+```
+
+Derivada com R:
+
+```{r}
+# --------Derivada de x^2 em relação a x
+derivada <- D(expression(x^2), "x")
+derivada
+
+
+# --------Calcula a derivada de sin(x) no ponto x = pi
+expr <- expression(sin(x))
+deriv_expr <- D(expr, "x")
+deriv_expr
+```
+
+Integral com R:
+
+```{r}
+# encontrar uma primitiva S(x) da função f(x)=x^5
+# Instale o pacote executando o comando abaixo caso ainda não o tenha:
+# install.packages("Ryacas")
+
+library(Ryacas)
+
+# Define 'x' como um símbolo matemático, não como uma variável numérica
+x <- sym("x")
+
+# Calcula a integral indefinida de x^5 em relação a x
+primitiva <- integrate(x^5, x)
+
+# Exibe o resultado
+print(primitiva)
+
+```
+
